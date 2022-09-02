@@ -1,12 +1,18 @@
 class O_Group:
-    pass
+    def execute(self):
+        pass
 class O_Expr:
-    pass
+    def execute(self):
+        pass
 class E_Group:
-    pass
+    def execute(self):
+        pass
 class E_Expr:
-    pass
+    def execute(self):
+        pass
 class O_Input:
-    pass
+    def execute(self):
+        pass
 class ApplyRule:
-    pass
+    def execute(self):
+        pass
