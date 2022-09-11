@@ -1,7 +1,6 @@
-from cmath import exp
-from lib2to3.pytree import Node
-from rule import Rule
-from pptree import *
+from curses import noecho
+from columbia.rule import Rule
+from utils import pptree 
 
 class Expr:
     def __init__(self, type: str, children: list, name: str) -> None:
@@ -59,6 +58,7 @@ class Group:
             children_trees = []
             for group in expr.children:
                 children_trees.append(group.all_trees())
+            assert(len(children_trees) == 2)
             for l_tree in children_trees[0]:
                 for r_tree in children_trees[1]:
                     trees.append({str(expr): [l_tree, r_tree]})
@@ -76,7 +76,27 @@ class Memo:
         return self.groups[0]
     
     def __str__(self) -> str:
-        return str(self.root().all_trees())    
+        def Node(name, parent):
+            if parent is None:
+                return pptree.Node(name)
+            else:
+                return pptree.Node(name, parent)
+        def serialize_tree(root: dict, parent: pptree.Node) -> Node:
+            if isinstance(root, str):
+                return pptree.Node(root, parent)
+            assert(len(root.keys()) == 1)
+            root_key = list(root.keys())[0]
+            root_node = Node(root_key, parent)
+            for child in root[root_key]:
+                serialize_tree(child, root_node)
+            return root_node
+        trees =  self.root().all_trees()
+        split_line = "\n\n\n**********************************************************************************************************"
+        output = ""
+        for tree in trees:
+            output += pptree.print_tree(serialize_tree(tree, None)) + split_line
+        return output
+    
 class Context:
     def __init__(self) -> None:
         pass

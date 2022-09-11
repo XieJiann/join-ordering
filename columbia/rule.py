@@ -1,3 +1,6 @@
+class Rule:
+    pass
+
 class ComRule:
     pass 
 
