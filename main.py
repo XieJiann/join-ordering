@@ -1,11 +1,11 @@
+from traceback import print_tb
 from columbia import optimizer as c_optimizer
+from utils.plan import PlanBuilder
 
 # defile join graph by <nodes, edges>
 # right now, we only support clique with inner join
-tables = {
-    "t1": 100,
-    "t2": 200,
-    "t3": 300
-}
+plan_builder = PlanBuilder()
+plan = plan_builder.join("t1", 1000).join("t2", 2000).join("t3", 3000).build()
 
-c_optimizer.optimize(tables, None)
+if plan is not None:
+    c_optimizer.optimize(plan)
