@@ -1,14 +1,14 @@
 from typing import Any, List, Optional
 from columbia.memo.expr_group import Expr, Group
 from columbia.rule import RuleSet
+from columbia.task import Task
 import utils.pptree as pptree
 
 
 class Memo:
-    def __init__(self, rule_set: "RuleSet") -> None:
+    def __init__(self) -> None:
         # root always in the front
         self.groups: List["Group"] = []
-        self.rule_set = rule_set
         self.expr_set: "set[Expr]" = set()
 
     def new_group(self) -> Group:
@@ -61,6 +61,17 @@ class Memo:
 
 
 class Context:
-    def __init__(self, cost_upper_bound: "float") -> None:
+    def __init__(self, cost_upper_bound: "float", rule_set: RuleSet) -> None:
         # cost_upper_bound init with the bigest value, e.g., 1e10
         self.cost_upper_bound = cost_upper_bound
+        self.task_stack: List[Task] = []
+        self.rule_set = rule_set
+
+    def push_task(self, task: Task) -> None:
+        self.task_stack.append(task)
+
+    def pop_task(self) -> Task:
+        return self.task_stack.pop()
+
+    def empty(self) -> bool:
+        return len(self.task_stack) == 0

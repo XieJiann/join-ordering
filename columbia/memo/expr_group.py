@@ -2,8 +2,13 @@ from enum import Enum, auto
 from typing import Any, List, Optional, Tuple
 import unittest
 
+from columbia.memo.memo import Context
+from columbia.rule import Rule
+
 
 class ExprType(Enum):
+    # Any, it's just used in pattern children
+    AnyExpr = auto()
     # logical
     LogicalInnerJoin = auto()
     LogicalTable = auto()
@@ -12,24 +17,31 @@ class ExprType(Enum):
     PhysicalScan = auto()
 
 
+def is_logical_leaf(e_type: ExprType) -> bool:
+    return e_type == ExprType.LogicalInnerJoin
+
+
 class Expr:
     def __init__(
         self,
         type: ExprType,
-        children: "Tuple[()] | Tuple[Group | Expr] | Tuple[Group | Expr, Group | Expr]",
+        expr_children: "Tuple[()] | Tuple[Expr | Group] | Tuple[Expr | Group, Expr | Group]",
         group: Optional["Group"],
         name: Optional[str],
         row_cnt: int,
     ) -> None:
-        self.children = children
+        self.children = expr_children
         self.type = type
         self.name = name
         self.rule_mask = 0
         self.group = group
         self.row_cnt = row_cnt
 
-    def set_explored(self, rule_id: "int") -> None:
-        self.rule_mask |= rule_id
+    def set_applied(self, rule: Rule) -> None:
+        self.rule_mask |= rule.id
+
+    def applied(self, rule: Rule) -> bool:
+        return (self.rule_mask & rule.id) != 0
 
     def is_logical(self) -> bool:
         return self.type in {ExprType.LogicalInnerJoin, ExprType.LogicalTable}
@@ -43,6 +55,11 @@ class Expr:
     ) -> "Expr":
         self.children = children
         return self
+
+    def child_at(self, i: int) -> "Group":
+        group = self.children[i]
+        assert isinstance(group, "Group")
+        return group
 
     def is_leaf(self) -> bool:
         return self.children == ()
@@ -64,16 +81,27 @@ class Group:
         self.gid = gid
         self.logical_exprs: List[Expr] = []
         self.physical_exprs: List[Expr] = []
+
         self.explored = False
         # the winner matain the idx of the expr with the lowest cost
         self.winner = None
+
         self.row_cnt = None
+
+        self.cost_lower_bound = -1  # useless?
+
+    def set_explored(self) -> None:
+        self.explored = True
 
     def record_expr(self, expr: Expr) -> None:
         if expr.is_logical():
             self.logical_exprs.append(expr)
         else:
             self.physical_exprs.append(expr)
+
+    def has_winner(self, context: Context) -> bool:
+        # The properties has not been supported yet
+        return self.winner != None
 
     def __hash__(self) -> int:
         return self.gid

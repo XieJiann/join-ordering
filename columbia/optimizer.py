@@ -6,12 +6,10 @@ from columbia.task import *
 
 def optimize(plan: Expr) -> None:
     rule_set = RuleSet()
-    memo = Memo(rule_set)
+    memo = Memo()
+    context = Context(float("inf"), rule_set)
     memo.record_plan(plan, None)
-    print(memo)
-    # task_stack = []
-    # task_stack.append(O_Group(memo.root()))
-    # context = Context()
+    context.task_stack.append(O_Group(memo.root(), context))
     # while not task_stack.empty():
     #     task  = task_stack.pop()
     #     task.execute(context, task_stack)
