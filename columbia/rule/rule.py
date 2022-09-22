@@ -20,6 +20,20 @@ PatternType = Union[
 ]
 
 
+def match_root(pattern: PatternType, expr: Expr) -> bool:
+    return pattern[0] == ExprType.AnyExpr or pattern[0] == expr.type
+
+
+def children(
+    patttern: PatternType,
+) -> Tuple[()] | Tuple[PatternType] | Tuple[PatternType, PatternType]:
+    return patttern[1]
+
+
+def child_at(pattern: PatternType, i: int) -> PatternType:
+    return pattern[1][i]
+
+
 class Rule:
     def __init__(self, promise: int, type: RuleType) -> None:
         self.type: RuleType = type
@@ -38,9 +52,6 @@ class Rule:
 
     def is_logical(self) -> bool:
         return self.type == RuleType.Logical
-
-    def match_root(self, expr: Expr) -> bool:
-        return len(self.pattern) == 0 or self.pattern[0] == expr.type
 
     def children_pattern(
         self,
@@ -71,12 +82,4 @@ class ComRule(Rule):
         return True
 
     def transform(self, input: Expr) -> List[Expr]:
-        new_expr = Expr(
-            input.type,
-            input.children,
-            input.group,
-            input.name,
-            input.row_cnt,
-        )
-        new_expr.set_children((input.child_at(1), input.child_at(0)))
-        return [new_expr]
+        return [input.set_children((input.group_child_at(1), input.group_child_at(0)))]

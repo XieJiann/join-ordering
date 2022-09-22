@@ -1,6 +1,6 @@
 from columbia.memo.expr_group import Expr, Group, is_logical_leaf
 from columbia.memo.memo import Context
-from columbia.rule import Rule
+from columbia.rule.rule import Rule, match_root
 
 
 class Task:
@@ -53,7 +53,7 @@ class O_Expr(Task):
 
     def execute(self) -> None:
         valid_rules = filter(
-            lambda r: r.match_root(self.expr)
+            lambda r: match_root(r.pattern, self.expr)
             and not self.expr.applied(r)
             and (self.exploring and r.is_logical()),
             self.context.rule_set.rule_list,
@@ -76,7 +76,9 @@ class O_Expr(Task):
             """
             for (i, child_pattern) in enumerate(rule.children_pattern()):
                 if is_logical_leaf(child_pattern[0]):
-                    self.context.push_task(E_Group(self.expr.child_at(i), self.context))
+                    self.context.push_task(
+                        E_Group(self.expr.group_child_at(i), self.context)
+                    )
 
 
 class O_Inputs(Task):

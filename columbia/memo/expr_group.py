@@ -3,7 +3,7 @@ from typing import Any, List, Optional, Tuple
 import unittest
 
 from columbia.memo.memo import Context
-from columbia.rule import Rule
+from columbia.rule.rule import Rule
 
 
 class ExprType(Enum):
@@ -30,6 +30,11 @@ class Expr:
         name: Optional[str],
         row_cnt: int,
     ) -> None:
+        """
+        The Expr is the basic node in optimizer.
+        When the children is Expr, it's a operator in the plan. Which means it has not been recorded in Memo
+        When the children is Group, it's a Multi-Expr in a group, which means all of children has been recorded
+        """
         self.children = expr_children
         self.type = type
         self.name = name
@@ -51,29 +56,56 @@ class Expr:
         return self
 
     def set_children(
-        self, children: Tuple["Group"] | Tuple["Group", "Group"]
+        self,
+        children: "Tuple[()] | Tuple[Expr | Group] | Tuple[Expr | Group, Expr | Group]",
     ) -> "Expr":
         self.children = children
         return self
 
-    def child_at(self, i: int) -> "Group":
+    def group_child_at(self, i: int) -> "Group":
         group = self.children[i]
         assert isinstance(group, "Group")
         return group
 
+    def children_size(self) -> int:
+        return len(self.children)
+
     def is_leaf(self) -> bool:
         return self.children == ()
 
-    def __str__(self) -> str:
-        if self.name is None:
-            return str(self.type).split(".")[-1]
-        return self.name
+    def copy(self) -> "Expr":
+        return Expr(self.type, self.children, self.group, self.name, self.row_cnt)
 
     def __hash__(self) -> int:
         return hash((self.type, self.name, self.children))
 
     def __eq__(self, __o: object) -> bool:
         return hash(self) == hash(__o)
+
+    def trees(self) -> List[Tuple[str, Any]]:
+        """
+        If this is a plan, then the children type is Expr.
+            Return result is [(root, (child1, child2))]
+        If this is a multi_expr, then the children type is Group.
+            Return result is [(root, (child1, child2)), ...]
+        """
+
+        def _handler_unary():
+            pass
+
+        def _handler_binary():
+            pass
+
+        root = self.name
+        if self.name is None:
+            root = str(self.type).split(".")[-1]
+        children: List[Any] = []
+        for child in self.children:
+            children.append(child.trees())
+
+        return (root, tuple(children))
+
+        return self.name
 
 
 class Group:
@@ -109,7 +141,7 @@ class Group:
     def __eq__(self, __o: object) -> bool:
         return self.gid == hash(__o)
 
-    def all_trees(self) -> list[Any]:
+    def trees(self) -> list[Any]:
         trees: List[Any] = []
         for expr in self.logical_exprs + self.physical_exprs:
             if expr.is_leaf():
@@ -127,7 +159,7 @@ class Group:
         return trees
 
 
-class Test(unittest.TestCase):
+class TestHash(unittest.TestCase):
     def test_hash(self) -> None:
         g1 = Group(0)
         e1 = Expr(ExprType.LogicalTable, (), g1, "t1", 1)

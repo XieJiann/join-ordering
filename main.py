@@ -1,4 +1,3 @@
-from traceback import print_tb
 from columbia import optimizer as c_optimizer
 from utils.plan import PlanBuilder
 
