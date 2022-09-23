@@ -1,10 +1,15 @@
 from columbia import optimizer as c_optimizer
-from utils.plan import PlanBuilder
+from plan.plan import LogicalPlanBuilder, LogicalType, Plan
 
 # defile join graph by <nodes, edges>
 # right now, we only support clique with inner join
-plan_builder = PlanBuilder()
-plan = plan_builder.join("t1", 1000).join("t2", 2000).join("t3", 3000).build()
 
+plan = (
+    LogicalPlanBuilder(Plan((), LogicalType.Table, 100, "t1"))
+    .join(Plan((), LogicalType.Table, 200, "t2"))
+    .join(Plan((), LogicalType.Table, 300, "t3"))
+    .join(Plan((), LogicalType.Table, 400, "t4"))
+    .build()
+)
 if plan is not None:
     c_optimizer.optimize(plan)

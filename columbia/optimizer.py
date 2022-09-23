@@ -1,15 +1,15 @@
-from columbia.memo.expr_group import Expr
-from columbia.memo.memo import Memo
-from columbia.rule import RuleSet
+from columbia.memo.memo import Context, Memo
+from columbia.rule.rule import RuleSet
 from columbia.task import *
+from plan.plan import Plan
 
 
-def optimize(plan: Expr) -> None:
-    rule_set = RuleSet()
+def optimize(plan: Plan) -> None:
     memo = Memo()
-    context = Context(float("inf"), rule_set)
     memo.record_plan(plan, None)
-    context.task_stack.append(O_Group(memo.root(), context))
+    rule_set = RuleSet()
+    context = Context(float("inf"), rule_set)
+    context.push_task(O_Group(memo.root(), context))
     # while not task_stack.empty():
     #     task  = task_stack.pop()
     #     task.execute(context, task_stack)

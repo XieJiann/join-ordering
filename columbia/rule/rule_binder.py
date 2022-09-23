@@ -1,22 +1,28 @@
 import itertools
 from typing import List
 import unittest
-from columbia.memo.expr_group import Expr, Group
-from columbia.rule.rule import PatternType, child_at, match_root
+from columbia.memo.expr_group import Expr, Group, LeafGroup
+from columbia.rule.rule import (
+    PatternType,
+    pattern_children,
+    match_root,
+    pattern_root,
+)
+from plan.plan import LogicalType, Plan
 
 
 class ExprBinder:
     def __init__(self, expr: Expr, pattern: PatternType) -> None:
         self.expr = expr
-        self.children_plan: List[List[Expr]] = []
-
-        # collect all valid plan
-        if not match_root(pattern, expr):
+        if not match_root(pattern, expr) or len(pattern_children(pattern)) != len(
+            expr.children
+        ):
             return
 
-        for i in range(0, expr.children_size()):
-            group_binder = GroupBinder(expr.group_child_at(i), child_at(pattern, i))
-            self.children_plan.append(list(group_binder.__iter__()))
+        # collect all valid plan
+        self.children_plan: List[List[Plan]] = []
+        for group, pattern in zip(expr.children, pattern_children(pattern)):
+            self.children_plan.append(GroupBinder(group, pattern).all_plan())
 
         self.permutaion: list[tuple[int, ...]] = list(
             itertools.product(
@@ -29,28 +35,29 @@ class ExprBinder:
     def __iter__(self):
         return self
 
-    def __next__(self) -> Expr:
-        if self.cur_idx == 0 and len(self.children_plan) == 0:
-            # The empty children means that there is no children for the pattern
-            # Maybe it's AnyType or Leaf Node
-            return self.expr
-        elif self.cur_idx < len(self.permutaion):
+    def __next__(self) -> Plan:
+        if self.cur_idx < len(self.permutaion):
             self.cur_idx += 1
-            children: List[Expr] = []
+            children: List[Plan] = []
             for i, j in enumerate(self.permutaion[self.cur_idx]):
                 children.append(self.children_plan[i][j])
-            return self.expr.copy().set_children((tuple(children)))
+            return Plan(
+                tuple(children), self.expr.type, self.expr.row_cnt, self.expr.name
+            )
         else:
             raise StopIteration
 
 
 class GroupBinder:
     def __init__(self, group: Group, pattern: PatternType) -> None:
-        self.plan: List[Expr] = []
+        self.plan: List[Plan] = []
+        if pattern_root(pattern) == LogicalType.Leaf:
+            self.plan = [LeafGroup(group)]
+            return
         for expr in group.logical_exprs + group.physical_exprs:
             self.plan.extend(list(ExprBinder(expr, pattern)))
 
-    def __iter__(self):
+    def all_plan(self) -> List[Plan]:
         return self.plan
 
 

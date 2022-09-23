@@ -1,4 +1,4 @@
-from columbia.memo.expr_group import Expr, Group, is_logical_leaf
+from columbia.memo.expr_group import Expr, Group
 from columbia.memo.memo import Context
 from columbia.rule.rule import Rule, match_root
 
@@ -67,7 +67,7 @@ class O_Expr(Task):
                1.Explore children group should be excuted before applying rule
                2.Only the children group of this rule should be explored
                3.The Leaf node isn't needed explored because there is no valid tranformation rule for them
-            
+
             e.g. For a Pattern:
                 Join
                |    |
@@ -75,10 +75,8 @@ class O_Expr(Task):
              We don't need explore Table, beacause it's a leaf
             """
             for (i, child_pattern) in enumerate(rule.children_pattern()):
-                if is_logical_leaf(child_pattern[0]):
-                    self.context.push_task(
-                        E_Group(self.expr.group_child_at(i), self.context)
-                    )
+                if child_pattern[0].is_logical():
+                    self.context.push_task(E_Group(self.expr.children[i], self.context))
 
 
 class O_Inputs(Task):

@@ -43,7 +43,6 @@ class LogicalType(OpType):
 class PhyiscalType(OpType):
     NSLJoin = auto()
     Scan = auto()
-    Leaf = auto()
 
 
 class Plan:
@@ -66,6 +65,10 @@ class Plan:
         if self.name is not None:
             return self.name
         return str(self.op_type)
+
+    def set_children(self, children: Tuple["Plan", ...]) -> "Plan":
+        self.children = children
+        return self
 
     def to_tree(self) -> Tuple[str, Tuple[Any, ...]]:
         return (str(self), tuple(map(lambda p: p.to_tree(), self.children)))

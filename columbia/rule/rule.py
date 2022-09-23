@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Tuple, List, Union
-from columbia.memo.expr_group import Expr, ExprType
+from columbia.memo.expr_group import Expr
+from plan.plan import LogicalType, OpType, Plan
 
 
 class RuleType(Enum):
@@ -14,19 +15,21 @@ class RuleType(Enum):
 (ExprType, (PatternType, PatternType)): Binary Expr
 """
 PatternType = Union[
-    Tuple[ExprType, Tuple["()"]],
-    Tuple[ExprType, Tuple["PatternType"]],
-    Tuple[ExprType, Tuple["PatternType", "PatternType"]],
+    Tuple[OpType, Tuple["()"]],
+    Tuple[OpType, Tuple["PatternType"]],
+    Tuple[OpType, Tuple["PatternType", "PatternType"]],
 ]
 
 
 def match_root(pattern: PatternType, expr: Expr) -> bool:
-    return pattern[0] == ExprType.AnyExpr or pattern[0] == expr.type
+    return pattern[0] == expr.type
 
 
-def children(
-    patttern: PatternType,
-) -> Tuple[()] | Tuple[PatternType] | Tuple[PatternType, PatternType]:
+def pattern_root(pattern: PatternType) -> OpType:
+    return pattern[0]
+
+
+def pattern_children(patttern: PatternType) -> Tuple[PatternType, ...]:
     return patttern[1]
 
 
@@ -39,12 +42,12 @@ class Rule:
         self.type: RuleType = type
         self.id = -1
         self.promise = promise
-        self.pattern: PatternType = (ExprType.AnyExpr, ())
+        self.pattern: PatternType = (LogicalType.Leaf, ())
 
-    def check(self, expr: Expr) -> bool:  # type: ignore
+    def check(self, expr: Plan) -> bool:  # type: ignore
         pass
 
-    def transform(self, input: Expr) -> List[Expr]:  # type: ignore
+    def transform(self, input: Plan) -> List[Plan]:  # type: ignore
         pass
 
     def set_id(self, id: int) -> None:
@@ -55,7 +58,7 @@ class Rule:
 
     def children_pattern(
         self,
-    ) -> Tuple[()] | Tuple[PatternType] | Tuple[PatternType, PatternType]:
+    ) -> Tuple[PatternType, ...]:
         return self.pattern[1]
 
 
@@ -74,12 +77,12 @@ class ComRule(Rule):
     def __init__(self) -> None:
         super().__init__(1, RuleType.Logical)
         self.pattern: PatternType = (
-            ExprType.LogicalInnerJoin,
-            ((ExprType.AnyExpr, ()), (ExprType.AnyExpr, ())),
+            LogicalType.InnerJoin,
+            ((LogicalType.Leaf, ()), (LogicalType.Leaf, ())),
         )
 
-    def check(self, expr: Expr) -> bool:
+    def check(self, expr: Plan) -> bool:
         return True
 
-    def transform(self, input: Expr) -> List[Expr]:
-        return [input.set_children((input.group_child_at(1), input.group_child_at(0)))]
+    def transform(self, input: Plan) -> List[Plan]:
+        return [input.set_children((input.children[1], input.children[0]))]
