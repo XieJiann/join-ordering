@@ -1,23 +1,19 @@
 from typing import List, Optional
 from columbia.memo.expr_group import Expr, Group, LeafGroup
-from columbia.rule.rule import RuleSet
-from columbia.task import Task
-from plan.plan import Plan
+from plan.plan import Plan, tree_printer
 
 
 class Memo:
-    def __init__(self) -> None:
+    def __init__(self, plan: Plan) -> None:
         # root always in the front
         self.groups: List["Group"] = []
         self.expr_dict: "dict[Expr, Group]" = {}
+        self.root = self.record_plan(plan, None)
 
     def new_group(self) -> Group:
         group = Group(len(self.groups))
         self.groups.append(group)
         return group
-
-    def root(self) -> Group:
-        return self.groups[0]
 
     def record_plan(self, plan: Plan, group: Optional[Group]) -> Group:
         if isinstance(plan, LeafGroup):
@@ -34,20 +30,9 @@ class Memo:
         self.expr_dict[expr] = group
         return group
 
-
-class Context:
-    def __init__(self, cost_upper_bound: "float", rule_set: RuleSet) -> None:
-        # cost_upper_bound init with the bigest value, e.g., 1e10
-        self.cost_upper_bound = cost_upper_bound
-        self.task_stack: List[Task] = []
-        self.rule_set = rule_set
-        self.properties = None
-
-    def push_task(self, task: Task) -> None:
-        self.task_stack.append(task)
-
-    def pop_task(self) -> Task:
-        return self.task_stack.pop()
-
-    def empty(self) -> bool:
-        return len(self.task_stack) == 0
+    def __str__(self) -> str:
+        res = ""
+        for plan in self.root.all_plan():
+            res += tree_printer(plan.to_tree())
+            res += "\n\n ************************** \n\n"
+        return res

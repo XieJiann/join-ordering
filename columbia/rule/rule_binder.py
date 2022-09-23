@@ -2,7 +2,7 @@ import itertools
 from typing import List
 import unittest
 from columbia.memo.expr_group import Expr, Group, LeafGroup
-from columbia.rule.rule import (
+from columbia.rule.pattern import (
     PatternType,
     pattern_children,
     match_root,
@@ -54,7 +54,7 @@ class GroupBinder:
         if pattern_root(pattern) == LogicalType.Leaf:
             self.plan = [LeafGroup(group)]
             return
-        for expr in group.logical_exprs + group.physical_exprs:
+        for expr in group.all_exprs():
             self.plan.extend(list(ExprBinder(expr, pattern)))
 
     def all_plan(self) -> List[Plan]:

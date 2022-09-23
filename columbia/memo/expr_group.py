@@ -1,5 +1,6 @@
+from itertools import chain, product
 from typing import List, Optional, Tuple
-from columbia.memo.memo import Context
+from columbia.memo.context import Context
 from columbia.rule.rule import Rule
 from plan.plan import LogicalType, OpType, Plan
 
@@ -52,6 +53,13 @@ class Expr:
     def copy(self) -> "Expr":
         return Expr(self.type, self.children, self.group, self.name, self.row_cnt)
 
+    def all_plan(self) -> List[Plan]:
+        group_plans = map(lambda g: g.all_plan(), self.children)
+        return [
+            Plan(children, self.type, self.row_cnt, self.name)
+            for children in product(*group_plans)
+        ]
+
     def __hash__(self) -> int:
         return hash((self.type, self.name, self.children))
 
@@ -82,10 +90,16 @@ class Group:
         else:
             self.physical_exprs.append(expr)
 
-    def has_winner(self, context: Context) -> bool:
+    def has_winner(self, context: "Context") -> bool:
         # The properties has not been supported yet
         assert context.properties is None
         return self.winner != None
+
+    def all_exprs(self) -> List[Expr]:
+        return self.logical_exprs + self.physical_exprs
+
+    def all_plan(self) -> List[Plan]:
+        return list(chain(*map(lambda e: e.all_plan(), self.all_exprs())))
 
     def __hash__(self) -> int:
         return self.gid

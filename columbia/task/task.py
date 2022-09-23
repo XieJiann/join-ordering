@@ -1,14 +1,8 @@
 from columbia.memo.expr_group import Expr, Group
-from columbia.memo.memo import Context
-from columbia.rule.rule import Rule, match_root
-
-
-class Task:
-    def __init__(self) -> None:
-        pass
-
-    def execute(self) -> None:
-        pass
+from columbia.memo.context import Context
+from columbia.rule.rule import Rule
+from columbia.rule.pattern import match_root
+from columbia.task.abstract_task import Task
 
 
 class O_Group(Task):
