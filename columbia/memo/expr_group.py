@@ -47,6 +47,10 @@ class Expr:
     def children_size(self) -> int:
         return len(self.children)
 
+    def get_group(self) -> "Group":
+        assert self.group is not None
+        return self.group
+
     def is_leaf(self) -> bool:
         return self.children == ()
 
@@ -75,7 +79,7 @@ class Group:
 
         self.explored = False
         # the winner matain the idx of the expr with the lowest cost
-        self.winner = None
+        self.winner: Optional[Tuple[Expr, float]] = None
 
         self.row_cnt = None
 
@@ -94,6 +98,14 @@ class Group:
         # The properties has not been supported yet
         assert context.properties is None
         return self.winner != None
+
+    def winner_cost(self) -> float:
+        assert self.winner is not None
+        return self.winner[1]
+
+    def set_winner(self, context: Context, expr: Expr, cost: float):
+        if not self.has_winner(context) or self.winner_cost() > cost:
+            self.winner = (expr, cost)
 
     def all_exprs(self) -> List[Expr]:
         return self.logical_exprs + self.physical_exprs

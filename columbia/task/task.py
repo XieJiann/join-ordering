@@ -1,7 +1,9 @@
+from columbia.cost.cost import cost_for_expr
 from columbia.memo.expr_group import Expr, Group
 from columbia.memo.context import Context
 from columbia.rule.rule import Rule
-from columbia.rule.pattern import match_root
+from columbia.rule.pattern import match_root, pattern_children
+from columbia.rule.rule_binder import ExprBinder
 from columbia.task.abstract_task import Task
 
 
@@ -65,21 +67,41 @@ class O_Expr(Task):
             e.g. For a Pattern:
                 Join
                |    |
-             Table Join
-             We don't need explore Table, beacause it's a leaf
+              Any  Any
+             We don't need explore Any Expr, beacause it's a leaf group in plan
             """
-            for (i, child_pattern) in enumerate(rule.children_pattern()):
-                if child_pattern[0].is_logical():
-                    self.context.push_task(E_Group(self.expr.children[i], self.context))
+            for (group, child_pattern) in zip(
+                self.expr.children, pattern_children(rule.pattern)
+            ):
+                if len(pattern_children(child_pattern)) == 0:
+                    self.context.push_task(E_Group(group, self.context))
 
 
 class O_Inputs(Task):
     def __init__(self, expr: Expr, context: Context) -> None:
         self.context = context
         self.expr = expr
+        self.cur_child_idx = -1
+        self.cur_total_cost = 0
 
     def execute(self) -> None:
-        pass
+        if self.cur_child_idx == -1:
+            self.cur_total_cost = cost_for_expr(self.expr)
+            self.cur_child_idx = 0
+
+        last_optimized = self.cur_child_idx
+        for child_group in self.expr.children[last_optimized:]:
+            self.cur_child_idx += 1
+            if child_group.has_winner(self.context):
+                self.cur_total_cost += child_group.winner_cost()
+                if self.cur_total_cost > self.context.cost_upper_bound:
+                    return
+            else:
+                self.context.push_task(self)
+                self.context.push_task(O_Group(child_group, self.context))
+                return
+        assert self.cur_child_idx == len(self.expr.children)
+        self.expr.get_group().set_winner(self.context, self.expr, self.cur_total_cost)
 
 
 class ApplyRule(Task):
@@ -92,4 +114,18 @@ class ApplyRule(Task):
         self.exploring = exploring
 
     def execute(self) -> None:
-        return super().execute()
+        expr_binder = ExprBinder(self.expr, self.rule.pattern)
+        for plan in expr_binder:
+            if not self.rule.check(plan):
+                continue
+
+            transformed_plans = self.rule.transform(plan)
+            for new_plan in transformed_plans:
+                expr, is_new = self.context.memo.record_plan(new_plan, self.expr.group)
+                if is_new:
+                    if expr.type.is_logical():
+                        self.context.push_task(
+                            O_Expr(expr, self.context, self.exploring)
+                        )
+                    else:
+                        self.context.push_task(O_Inputs(expr, self.context))
