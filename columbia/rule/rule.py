@@ -56,6 +56,7 @@ class RuleSet:
         self.rule_list: List[Rule] = []
         self.add_rule(ComRule())
         self.add_rule(NSLRule())
+        self.add_rule(AssocRule())
         sorted(self.rule_list, key=lambda v: v.promise)
 
     def add_rule(self, rule: Rule) -> None:
@@ -66,10 +67,8 @@ class RuleSet:
 class ComRule(Rule):
     def __init__(self) -> None:
         super().__init__(1, RuleType.Logical)
-        self.pattern: PatternType = (
-            LogicalType.InnerJoin,
-            ((LogicalType.Leaf, ()), (LogicalType.Leaf, ())),
-        )
+        leaf: PatternType = (LogicalType.Leaf, ())
+        self.pattern: PatternType = (LogicalType.InnerJoin, (leaf, leaf))
         self.name = "ComRule"
 
     def check(self, expr: Plan) -> bool:
@@ -77,6 +76,47 @@ class ComRule(Rule):
 
     def transform(self, input: Plan) -> List[Plan]:
         return [input.set_children((input.children[1], input.children[0]))]
+
+
+class AssocRule(Rule):
+    def __init__(self) -> None:
+        leaf: PatternType = (LogicalType.Leaf, ())
+        super().__init__(1, RuleType.Logical)
+        self.pattern: PatternType = (
+            LogicalType.InnerJoin,
+            ((LogicalType.InnerJoin, (leaf, leaf)), leaf),
+        )
+        self.name = "AssocRule"
+
+    def check(self, expr: Plan) -> bool:
+        return True
+
+    def transform(self, input: Plan) -> List[Plan]:
+        """
+             top_join                left_join
+             |      |                |       |
+          left_join LEAF3   ====>   LEAF1    top_join
+          |       |                          |      |
+        LEAF1     LEAF2                    LEAF2   LEAF3
+
+        """
+        top_join = input
+        left_join = input.children[0]
+        assert left_join.op_type == LogicalType.InnerJoin
+        right_join = Plan(
+            (left_join.children[1], top_join.children[1]),
+            LogicalType.InnerJoin,
+            left_join.children[1].row_cnt * top_join.children[1].row_cnt,
+            None,
+        )
+        new_top_join = Plan(
+            (left_join.children[0], right_join),
+            LogicalType.InnerJoin,
+            top_join.row_cnt,
+            None,
+        )
+
+        return [new_top_join]
 
 
 class NSLRule(Rule):

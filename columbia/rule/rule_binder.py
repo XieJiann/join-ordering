@@ -4,8 +4,8 @@ import unittest
 from columbia.memo.expr_group import Expr, Group, LeafGroup
 from columbia.rule.pattern import (
     PatternType,
-    pattern_children,
     match_root,
+    pattern_children,
     pattern_root,
 )
 from plan.plan import LogicalType, Plan
@@ -14,11 +14,7 @@ from plan.plan import LogicalType, Plan
 class ExprBinder:
     def __init__(self, expr: Expr, pattern: PatternType) -> None:
         self.expr = expr
-        if not match_root(pattern, expr) or len(pattern_children(pattern)) != len(
-            expr.children
-        ):
-            return
-
+        self.cur_idx = 0
         # collect all valid plan
         self.children_plan: List[List[Plan]] = []
         for group, pattern in zip(expr.children, pattern_children(pattern)):
@@ -29,8 +25,6 @@ class ExprBinder:
                 *[range(0, len(indices)) for indices in self.children_plan]
             )
         )
-
-        self.cur_idx = 0
 
     def __iter__(self):
         return self
@@ -55,6 +49,10 @@ class GroupBinder:
             self.plan = [LeafGroup(group)]
             return
         for expr in group.all_exprs():
+            if not match_root(pattern, expr) or (
+                len(pattern_children(pattern)) != len(expr.children)
+            ):
+                continue
             self.plan.extend(list(ExprBinder(expr, pattern)))
 
     def all_plan(self) -> List[Plan]:
