@@ -1,6 +1,6 @@
 from itertools import chain, product
 from typing import List, Optional, Tuple
-from columbia.memo.context import Context
+from columbia.memo.properties import PropertySet
 from columbia.rule.rule import Rule
 from plan.plan import LogicalType, OpType, Plan
 
@@ -70,6 +70,11 @@ class Expr:
     def __eq__(self, __o: object) -> bool:
         return hash(self) == hash(__o)
 
+    def __str__(self) -> str:
+        if self.name is None:
+            return str(self.type)
+        return str(self.type) + self.name
+
 
 class Group:
     def __init__(self, gid: int) -> None:
@@ -94,17 +99,17 @@ class Group:
         else:
             self.physical_exprs.append(expr)
 
-    def has_winner(self, context: "Context") -> bool:
+    def has_winner(self, property_set: PropertySet) -> bool:
         # The properties has not been supported yet
-        assert context.properties is None
+        assert property_set.is_empty()
         return self.winner != None
 
     def winner_cost(self) -> float:
         assert self.winner is not None
         return self.winner[1]
 
-    def set_winner(self, context: Context, expr: Expr, cost: float):
-        if not self.has_winner(context) or self.winner_cost() > cost:
+    def set_winner(self, property_set: PropertySet, expr: Expr, cost: float):
+        if not self.has_winner(property_set) or self.winner_cost() > cost:
             self.winner = (expr, cost)
 
     def all_exprs(self) -> List[Expr]:
@@ -118,6 +123,11 @@ class Group:
 
     def __eq__(self, __o: object) -> bool:
         return self.gid == hash(__o)
+
+    def __str__(self) -> str:
+        return str(
+            tuple(map(lambda expr: str(expr), self.logical_exprs + self.physical_exprs))
+        )
 
 
 class LeafGroup(Plan):

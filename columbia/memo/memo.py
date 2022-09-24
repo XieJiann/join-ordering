@@ -34,6 +34,7 @@ class Memo:
         if group is None:
             group = self.new_group()
         group.record_expr(expr)
+        expr = expr.set_group(group)
         self.expr_dict[expr] = group
         return (expr, True)
 

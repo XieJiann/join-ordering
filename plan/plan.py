@@ -18,7 +18,6 @@ def tree_printer(tree: Tuple[str, Tuple[Any, ...]]) -> str:
         for child in children[1:]:
             res.append(f"{' '*len(tree[0])}   └─── {child[0]}")
             for sub_child in child[1:]:
-                print("sub:", sub_child)
                 res.append(f"{' '*len(tree[0])}        {sub_child}")
         return res
 

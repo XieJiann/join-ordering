@@ -37,10 +37,10 @@ class ExprBinder:
 
     def __next__(self) -> Plan:
         if self.cur_idx < len(self.permutaion):
-            self.cur_idx += 1
             children: List[Plan] = []
             for i, j in enumerate(self.permutaion[self.cur_idx]):
                 children.append(self.children_plan[i][j])
+            self.cur_idx += 1
             return Plan(
                 tuple(children), self.expr.type, self.expr.row_cnt, self.expr.name
             )

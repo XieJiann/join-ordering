@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Tuple, List
-from plan.plan import LogicalType, Plan
+from plan.plan import LogicalType, PhyiscalType, Plan
 from typing import Tuple, Union
 from plan.plan import OpType
 
@@ -28,6 +28,7 @@ class Rule:
         self.id = -1
         self.promise = promise
         self.pattern: PatternType = (LogicalType.Leaf, ())
+        self.name = "rule"
 
     def check(self, expr: Plan) -> bool:  # type: ignore
         pass
@@ -46,11 +47,15 @@ class Rule:
     ) -> Tuple[PatternType, ...]:
         return self.pattern[1]
 
+    def __str__(self) -> str:
+        return self.name
+
 
 class RuleSet:
     def __init__(self) -> None:
         self.rule_list: List[Rule] = []
         self.add_rule(ComRule())
+        self.add_rule(NSLRule())
         sorted(self.rule_list, key=lambda v: v.promise)
 
     def add_rule(self, rule: Rule) -> None:
@@ -65,9 +70,26 @@ class ComRule(Rule):
             LogicalType.InnerJoin,
             ((LogicalType.Leaf, ()), (LogicalType.Leaf, ())),
         )
+        self.name = "ComRule"
 
     def check(self, expr: Plan) -> bool:
         return True
 
     def transform(self, input: Plan) -> List[Plan]:
         return [input.set_children((input.children[1], input.children[0]))]
+
+
+class NSLRule(Rule):
+    def __init__(self) -> None:
+        super().__init__(2, RuleType.Logical)
+        self.pattern: PatternType = (
+            LogicalType.InnerJoin,
+            ((LogicalType.Leaf, ()), (LogicalType.Leaf, ())),
+        )
+        self.name = "NSLRule"
+
+    def check(self, expr: Plan) -> bool:
+        return True
+
+    def transform(self, input: Plan) -> List[Plan]:
+        return [Plan(input.children, PhyiscalType.NSLJoin, input.row_cnt, input.name)]
