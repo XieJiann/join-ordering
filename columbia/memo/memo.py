@@ -29,6 +29,7 @@ class Memo:
         )
         expr = Expr(plan.op_type, tuple(group_children), None, plan.name, plan.row_cnt)
         if expr in self.expr_dict:
+            expr.set_group(self.expr_dict[expr])
             return (expr, False)
 
         if group is None:

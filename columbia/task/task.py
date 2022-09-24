@@ -121,6 +121,10 @@ class ApplyRule(Task):
 
     def execute(self) -> None:
         logger.info(f"ApplyRule {self.expr} {self.rule}")
+        if not match_root(self.rule.pattern, self.expr) or (
+            len(pattern_children(self.rule.pattern)) != len(self.expr.children)
+        ):
+            return
         expr_binder = ExprBinder(self.expr, self.rule.pattern)
         for plan in expr_binder:
             if not self.rule.check(plan):
