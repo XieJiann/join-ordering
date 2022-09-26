@@ -17,7 +17,7 @@ class O_Group(Task):
 
     def execute(self) -> None:
         ident = "\t" * self.level
-        logger.info(
+        logger.debug(
             f"{ident} O_Group {str(self.group)} with winner {self.group.has_winner(self.context.property_set)}"
         )
 
@@ -40,7 +40,7 @@ class E_Group(Task):
 
     def execute(self) -> None:
         ident = "\t" * self.level
-        logger.info(f"{ident}E_Group {str(self.group)}")
+        logger.debug(f"{ident}E_Group {str(self.group)}")
         if self.group.explored:
             return
         for expr in self.group.logical_exprs:
@@ -60,7 +60,7 @@ class O_Expr(Task):
 
     def execute(self) -> None:
         ident = "\t" * self.level
-        logger.info(f"{ident}O_Expr [exploring={self.exploring}] {self.expr}")
+        logger.debug(f"{ident}O_Expr [exploring={self.exploring}] {self.expr}")
         valid_rules = filter(
             lambda r: match_root(r.pattern, self.expr)
             and not self.expr.applied(r)
@@ -95,17 +95,22 @@ class O_Inputs(Task):
         self.context = context
         self.expr = expr
         self.cur_child_idx = -1
+        self.prev_child_idx = -1  # This variable marks the child that is optimizing
         self.cur_total_cost = 0
         self.level = level
 
     def execute(self) -> None:
         ident = "\t" * self.level
-        logger.info(
+        logger.debug(
             f"{ident}O_Inputs {self.expr} with {self.cur_child_idx+1} children with bound {self.context.cost_upper_bound}"
         )
+
         if self.cur_child_idx == -1:
             self.cur_total_cost = cost_for_expr(self.expr)
+            if self.cur_total_cost > self.context.cost_upper_bound:
+                return
             self.cur_child_idx = 0
+
         last_optimized = self.cur_child_idx
         for child_group in self.expr.children[last_optimized:]:
             if child_group.has_winner(self.context.property_set):
@@ -113,19 +118,33 @@ class O_Inputs(Task):
                 self.cur_total_cost += child_group.winner_cost()
                 if self.cur_total_cost > self.context.cost_upper_bound:
                     return
-            else:
+            elif self.prev_child_idx != self.cur_child_idx:
+                """
+                Sometimes the O_Group can't get the optimal expr for this group beacause of pruning in loc 110/115
+                The O_Input will be called after the invalid O_Group, and to avoid push O_Group repeatly, we need to mark this case.
+                That is prev_child_idx == cur_child_idx, so we will break this loop and set the lower cost in follows
+                O_INPUTS                  (cur_child_idx == prev_child_idx and group has no winner)
+                    =>  O_INPUTS              ⬆
+                    =>  O_GROUP               |
+                        => O_Expr             |
+                        => O_INPUYS (terminated)
+                """
+                self.prev_child_idx = self.cur_child_idx
                 self.context.push_task(self)
                 self.context.push_task(
                     O_Group(child_group, self.context.copy(), self.level + 1)
                 )
                 return
-        assert self.cur_child_idx == len(self.expr.children)
-        self.expr.get_group().set_winner(
-            self.context.property_set, self.expr, self.cur_total_cost
-        )
-        self.context.cost_upper_bound = min(
-            self.cur_total_cost, self.context.cost_upper_bound
-        )
+            else:
+                break
+
+        if self.cur_child_idx == len(self.expr.children):
+            self.expr.get_group().set_winner(
+                self.context.property_set, self.expr, self.cur_total_cost
+            )
+            self.context.cost_upper_bound = min(
+                self.cur_total_cost, self.context.cost_upper_bound
+            )
 
 
 class ApplyRule(Task):
@@ -140,7 +159,7 @@ class ApplyRule(Task):
 
     def execute(self) -> None:
         ident = "\t" * self.level
-        logger.info(f"{ident}ApplyRule {self.rule} for {self.expr}")
+        logger.debug(f"{ident}ApplyRule {self.rule} for {self.expr}")
         if not match_root(self.rule.pattern, self.expr) or (
             len(pattern_children(self.rule.pattern)) != len(self.expr.children)
         ):
@@ -162,3 +181,4 @@ class ApplyRule(Task):
                         self.context.push_task(
                             O_Inputs(expr, self.context, self.level + 1)
                         )
+        self.expr.set_applied(self.rule)

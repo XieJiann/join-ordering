@@ -57,7 +57,7 @@ class RuleSet:
         self.add_rule(ScanRule())
         self.add_rule(ComRule())
         self.add_rule(NSLRule())
-        # self.add_rule(AssocRule())
+        self.add_rule(AssocRule())
         sorted(self.rule_list, key=lambda v: v.promise)
 
     def add_rule(self, rule: Rule) -> None:

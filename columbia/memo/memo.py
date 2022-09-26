@@ -1,5 +1,6 @@
 from typing import List, Optional, Tuple
 from columbia.memo.expr_group import Expr, Group, LeafGroup
+from columbia.memo.properties import PropertySet
 from plan.plan import Plan, tree_printer
 
 
@@ -31,13 +32,15 @@ class Memo:
         if expr in self.expr_dict:
             expr.set_group(self.expr_dict[expr])
             return (expr, False)
-
         if group is None:
             group = self.new_group()
         group.record_expr(expr)
         expr = expr.set_group(group)
         self.expr_dict[expr] = group
         return (expr, True)
+
+    def get_winner(self, property_set: PropertySet) -> Plan:
+        return self.root.get_winner_plan(property_set)
 
     def __str__(self) -> str:
         res = ""

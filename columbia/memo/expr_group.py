@@ -1,5 +1,5 @@
 from itertools import chain, product
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 from columbia.memo.properties import PropertySet
 from columbia.rule.rule import Rule
 from plan.plan import LogicalType, OpType, Plan
@@ -25,10 +25,10 @@ class Expr:
         self.row_cnt = row_cnt
 
     def set_applied(self, rule: Rule) -> None:
-        self.rule_mask |= rule.id
+        self.rule_mask |= 1 << rule.id
 
     def applied(self, rule: Rule) -> bool:
-        return (self.rule_mask & rule.id) != 0
+        return (self.rule_mask & (1 << rule.id)) != 0
 
     def is_logical(self) -> bool:
         return self.type.is_logical()
@@ -112,6 +112,14 @@ class Group:
         if not self.has_winner(property_set) or self.winner_cost() > cost:
             self.winner = (expr, cost)
 
+    def get_winner_plan(self, property_set: PropertySet) -> Plan:
+        assert self.winner is not None
+        winner_expr = self.winner[0]
+        children = tuple(
+            map(lambda g: g.get_winner_plan(property_set), winner_expr.children)
+        )
+        return Plan(children, winner_expr.type, winner_expr.row_cnt, winner_expr.name)
+
     def all_exprs(self) -> List[Expr]:
         return self.logical_exprs + self.physical_exprs
 
@@ -136,6 +144,12 @@ class LeafGroup(Plan):
     def __init__(self, group: Group) -> None:
         super().__init__((), LogicalType.Leaf, -1, None)
         self.group = group
+
+    def __str__(self) -> str:
+        return str(self.group.logical_exprs[0])
+
+    def to_tree(self) -> Tuple[str, Tuple[Any, ...]]:
+        return (str(self.group.logical_exprs[0]), ())
 
     def __hash__(self) -> int:
         return hash(self.group)

@@ -6,7 +6,7 @@ from columbia.task.task import O_Group
 from plan.plan import Plan
 
 
-def optimize(plan: Plan) -> None:
+def optimize(plan: Plan) -> Plan:
     memo = Memo(plan)
     rule_set = RuleSet()
     context = Context(memo, float("inf"), rule_set, PropertySet(), [])
@@ -14,4 +14,4 @@ def optimize(plan: Plan) -> None:
     while not context.has_no_task():
         task = context.pop_task()
         task.execute()
-    print(memo.root.winner)
+    return memo.get_winner(context.property_set)
