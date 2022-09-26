@@ -1,10 +1,10 @@
 from columbia import optimizer as c_optimizer
 from plan.plan import LogicalPlanBuilder, LogicalType, Plan
 
-plan = (
-    LogicalPlanBuilder(Plan((), LogicalType.Table, 100, "t1"))
-    .join(Plan((), LogicalType.Table, 200, "t2"))
-    .join(Plan((), LogicalType.Table, 300, "t3"))
+plan: Plan = (
+    LogicalPlanBuilder(Plan((), LogicalType.Table, 2, "t1"))
+    .join(Plan((), LogicalType.Table, 1, "t2"))
+    .join(Plan((), LogicalType.Table, 3, "t3"))
     .build()
 )
 if plan is not None:

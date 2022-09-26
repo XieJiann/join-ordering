@@ -12,10 +12,11 @@ class Context:
         cost_upper_bound: "float",
         rule_set: RuleSet,
         property_set: PropertySet,
+        task_stack: List[Task],
     ) -> None:
         # cost_upper_bound init with the bigest value, e.g., 1e10
-        self.cost_upper_bound = cost_upper_bound
-        self.task_stack: List[Task] = []
+        self.cost_upper_bound: float = cost_upper_bound
+        self.task_stack: List[Task] = task_stack
         self.rule_set = rule_set
         self.properties = None
         self.memo = memo
@@ -29,3 +30,12 @@ class Context:
 
     def has_no_task(self) -> bool:
         return len(self.task_stack) == 0
+
+    def copy(self) -> "Context":
+        return Context(
+            self.memo,
+            self.cost_upper_bound,
+            self.rule_set,
+            self.property_set,
+            self.task_stack,
+        )

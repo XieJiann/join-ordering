@@ -9,48 +9,58 @@ from columbia.task.abstract_task import Task
 
 
 class O_Group(Task):
-    def __init__(self, group: Group, context: Context) -> None:
+    def __init__(self, group: Group, context: Context, level: int = 0) -> None:
         self.context = context
         self.group = group
+        # The level only used for print trace
+        self.level = level
 
     def execute(self) -> None:
-        logger.info(f"O_Group {str(self.group)}")
+        ident = "\t" * self.level
+        logger.info(
+            f"{ident} O_Group {str(self.group)} with winner {self.group.has_winner(self.context.property_set)}"
+        )
+
         if self.group.cost_lower_bound > self.context.cost_upper_bound:
             # TODO[xj]: 看起来毫无用处，应该删去
             return
-
         if self.group.has_winner(self.context.property_set):
             return
-
         for expr in self.group.logical_exprs:
-            self.context.push_task(O_Expr(expr, self.context, exploring=False))
+            self.context.push_task(O_Expr(expr, self.context, False, self.level + 1))
         for expr in self.group.physical_exprs:
-            self.context.push_task(O_Inputs(expr, self.context))
+            self.context.push_task(O_Inputs(expr, self.context, self.level + 1))
 
 
 class E_Group(Task):
-    def __init__(self, group: Group, context: Context) -> None:
+    def __init__(self, group: Group, context: Context, level: int) -> None:
         self.context = context
         self.group = group
+        self.level = level
 
     def execute(self) -> None:
-        logger.info(f"E_Group {str(self.group)}")
+        ident = "\t" * self.level
+        logger.info(f"{ident}E_Group {str(self.group)}")
         if self.group.explored:
             return
         for expr in self.group.logical_exprs:
-            self.context.push_task(O_Expr(expr, self.context, exploring=True))
+            self.context.push_task(O_Expr(expr, self.context, True, self.level + 1))
         # 因为不存在环，所以可以直接mark explored
         self.group.set_explored()
 
 
 class O_Expr(Task):
-    def __init__(self, expr: Expr, context: Context, exploring: bool) -> None:
+    def __init__(
+        self, expr: Expr, context: Context, exploring: bool, level: int
+    ) -> None:
         self.context = context
         self.expr = expr
         self.exploring = exploring
+        self.level = level
 
     def execute(self) -> None:
-        logger.info(f"E_Expr {self.expr}")
+        ident = "\t" * self.level
+        logger.info(f"{ident}O_Expr [exploring={self.exploring}] {self.expr}")
         valid_rules = filter(
             lambda r: match_root(r.pattern, self.expr)
             and not self.expr.applied(r)
@@ -59,7 +69,7 @@ class O_Expr(Task):
         )
         for rule in valid_rules:
             self.context.push_task(
-                ApplyRule(self.expr, rule, self.context, self.exploring)
+                ApplyRule(self.expr, rule, self.context, self.exploring, self.level + 1)
             )
             """
             Before applying the rule, we should explore the children group for full macthing
@@ -77,50 +87,60 @@ class O_Expr(Task):
                 self.expr.children, pattern_children(rule.pattern)
             ):
                 if len(pattern_children(child_pattern)) == 0:
-                    self.context.push_task(E_Group(group, self.context))
+                    self.context.push_task(E_Group(group, self.context, self.level + 1))
 
 
 class O_Inputs(Task):
-    def __init__(self, expr: Expr, context: Context) -> None:
+    def __init__(self, expr: Expr, context: Context, level: int) -> None:
         self.context = context
         self.expr = expr
         self.cur_child_idx = -1
         self.cur_total_cost = 0
+        self.level = level
 
     def execute(self) -> None:
-        logger.info(f"O_Inputs {self.expr}")
+        ident = "\t" * self.level
+        logger.info(
+            f"{ident}O_Inputs {self.expr} with {self.cur_child_idx+1} children with bound {self.context.cost_upper_bound}"
+        )
         if self.cur_child_idx == -1:
             self.cur_total_cost = cost_for_expr(self.expr)
             self.cur_child_idx = 0
-
         last_optimized = self.cur_child_idx
         for child_group in self.expr.children[last_optimized:]:
-            self.cur_child_idx += 1
             if child_group.has_winner(self.context.property_set):
+                self.cur_child_idx += 1
                 self.cur_total_cost += child_group.winner_cost()
                 if self.cur_total_cost > self.context.cost_upper_bound:
                     return
             else:
                 self.context.push_task(self)
-                self.context.push_task(O_Group(child_group, self.context))
+                self.context.push_task(
+                    O_Group(child_group, self.context.copy(), self.level + 1)
+                )
                 return
         assert self.cur_child_idx == len(self.expr.children)
         self.expr.get_group().set_winner(
             self.context.property_set, self.expr, self.cur_total_cost
         )
+        self.context.cost_upper_bound = min(
+            self.cur_total_cost, self.context.cost_upper_bound
+        )
 
 
 class ApplyRule(Task):
     def __init__(
-        self, expr: Expr, rule: Rule, context: Context, exploring: bool
+        self, expr: Expr, rule: Rule, context: Context, exploring: bool, level: int
     ) -> None:
         self.context = context
         self.expr = expr
         self.rule = rule
         self.exploring = exploring
+        self.level = level
 
     def execute(self) -> None:
-        logger.info(f"ApplyRule {self.expr} {self.rule}")
+        ident = "\t" * self.level
+        logger.info(f"{ident}ApplyRule {self.rule} for {self.expr}")
         if not match_root(self.rule.pattern, self.expr) or (
             len(pattern_children(self.rule.pattern)) != len(self.expr.children)
         ):
@@ -136,7 +156,9 @@ class ApplyRule(Task):
                 if is_new:
                     if expr.type.is_logical():
                         self.context.push_task(
-                            O_Expr(expr, self.context, self.exploring)
+                            O_Expr(expr, self.context, self.exploring, self.level + 1)
                         )
                     else:
-                        self.context.push_task(O_Inputs(expr, self.context))
+                        self.context.push_task(
+                            O_Inputs(expr, self.context, self.level + 1)
+                        )

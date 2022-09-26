@@ -58,7 +58,7 @@ class Expr:
         return Expr(self.type, self.children, self.group, self.name, self.row_cnt)
 
     def all_plan(self) -> List[Plan]:
-        group_plans = map(lambda g: g.all_plan(), self.children)
+        group_plans = map(lambda g: g.all_plan(self.type.is_logical()), self.children)
         return [
             Plan(children, self.type, self.row_cnt, self.name)
             for children in product(*group_plans)
@@ -115,8 +115,10 @@ class Group:
     def all_exprs(self) -> List[Expr]:
         return self.logical_exprs + self.physical_exprs
 
-    def all_plan(self) -> List[Plan]:
-        return list(chain(*map(lambda e: e.all_plan(), self.all_exprs())))
+    def all_plan(self, logical: bool) -> List[Plan]:
+        if logical:
+            return list(chain(*map(lambda e: e.all_plan(), self.logical_exprs)))
+        return list(chain(*map(lambda e: e.all_plan(), self.physical_exprs)))
 
     def __hash__(self) -> int:
         return self.gid

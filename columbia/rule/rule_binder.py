@@ -15,11 +15,14 @@ class ExprBinder:
     def __init__(self, expr: Expr, pattern: PatternType) -> None:
         self.expr = expr
         self.cur_idx = 0
+        self.permutaion = [()]
+        self.children_plan = [[]]
+        if len(self.expr.children) == 0:
+            return
         # collect all valid plan
         self.children_plan: List[List[Plan]] = []
         for group, pattern in zip(expr.children, pattern_children(pattern)):
             self.children_plan.append(GroupBinder(group, pattern).all_plan())
-
         self.permutaion: list[tuple[int, ...]] = list(
             itertools.product(
                 *[range(0, len(indices)) for indices in self.children_plan]
