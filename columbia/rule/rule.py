@@ -54,9 +54,10 @@ class Rule:
 class RuleSet:
     def __init__(self) -> None:
         self.rule_list: List[Rule] = []
+        self.add_rule(ScanRule())
         self.add_rule(ComRule())
         self.add_rule(NSLRule())
-        self.add_rule(AssocRule())
+        # self.add_rule(AssocRule())
         sorted(self.rule_list, key=lambda v: v.promise)
 
     def add_rule(self, rule: Rule) -> None:
@@ -121,7 +122,7 @@ class AssocRule(Rule):
 
 class NSLRule(Rule):
     def __init__(self) -> None:
-        super().__init__(2, RuleType.Logical)
+        super().__init__(2, RuleType.Physical)
         self.pattern: PatternType = (
             LogicalType.InnerJoin,
             ((LogicalType.Leaf, ()), (LogicalType.Leaf, ())),
@@ -133,3 +134,16 @@ class NSLRule(Rule):
 
     def transform(self, input: Plan) -> List[Plan]:
         return [Plan(input.children, PhyiscalType.NSLJoin, input.row_cnt, input.name)]
+
+
+class ScanRule(Rule):
+    def __init__(self) -> None:
+        super().__init__(2, RuleType.Physical)
+        self.pattern: PatternType = (LogicalType.Table, ())
+        self.name = "ScanRule"
+
+    def check(self, expr: Plan) -> bool:
+        return True
+
+    def transform(self, input: Plan) -> List[Plan]:
+        return [Plan(input.children, PhyiscalType.Scan, input.row_cnt, input.name)]

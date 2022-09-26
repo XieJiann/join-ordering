@@ -41,7 +41,10 @@ class Memo:
 
     def __str__(self) -> str:
         res = ""
-        for plan in self.root.all_plan():
+        for plan in self.root.all_plan(logical=True):
+            res += tree_printer(plan.to_tree())
+            res += "\n\n ************************** \n\n"
+        for plan in self.root.all_plan(logical=False):
             res += tree_printer(plan.to_tree())
             res += "\n\n ************************** \n\n"
         return res
