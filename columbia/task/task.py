@@ -115,7 +115,9 @@ class O_Inputs(Task):
         for child_group in self.expr.children[last_optimized:]:
             if child_group.has_winner(self.context.property_set):
                 self.cur_child_idx += 1
-                self.cur_total_cost += child_group.winner_cost()
+                self.cur_total_cost += child_group.winner_cost(
+                    self.context.property_set
+                )
                 if self.cur_total_cost > self.context.cost_upper_bound:
                     return
             elif self.prev_child_idx != self.cur_child_idx:
@@ -136,6 +138,7 @@ class O_Inputs(Task):
                 )
                 return
             else:
+                # pruning
                 break
 
         if self.cur_child_idx == len(self.expr.children):

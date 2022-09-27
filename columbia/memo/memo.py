@@ -39,8 +39,11 @@ class Memo:
         self.expr_dict[expr] = group
         return (expr, True)
 
-    def get_winner(self, property_set: PropertySet) -> Plan:
-        return self.root.get_winner_plan(property_set)
+    def get_winner(self, property_set: PropertySet) -> Tuple[Plan, float]:
+        return (
+            self.root.winner_plan(property_set),
+            self.root.winner_cost(property_set),
+        )
 
     def __str__(self) -> str:
         res = ""

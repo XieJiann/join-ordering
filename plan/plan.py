@@ -63,7 +63,7 @@ class Plan:
     def __str__(self) -> str:
         if self.name is not None:
             return self.name
-        return str(self.op_type)
+        return str((str(self.op_type), self.row_cnt))
 
     def set_children(self, children: Tuple["Plan", ...]) -> "Plan":
         self.children = children

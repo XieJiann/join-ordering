@@ -104,19 +104,19 @@ class Group:
         assert property_set.is_empty()
         return self.winner != None
 
-    def winner_cost(self) -> float:
+    def winner_cost(self, property_set: PropertySet) -> float:
         assert self.winner is not None
         return self.winner[1]
 
     def set_winner(self, property_set: PropertySet, expr: Expr, cost: float):
-        if not self.has_winner(property_set) or self.winner_cost() > cost:
+        if not self.has_winner(property_set) or self.winner_cost(property_set) > cost:
             self.winner = (expr, cost)
 
-    def get_winner_plan(self, property_set: PropertySet) -> Plan:
+    def winner_plan(self, property_set: PropertySet) -> Plan:
         assert self.winner is not None
         winner_expr = self.winner[0]
         children = tuple(
-            map(lambda g: g.get_winner_plan(property_set), winner_expr.children)
+            map(lambda g: g.winner_plan(property_set), winner_expr.children)
         )
         return Plan(children, winner_expr.type, winner_expr.row_cnt, winner_expr.name)
 
@@ -142,7 +142,7 @@ class Group:
 
 class LeafGroup(Plan):
     def __init__(self, group: Group) -> None:
-        super().__init__((), LogicalType.Leaf, -1, None)
+        super().__init__((), LogicalType.Leaf, group.logical_exprs[0].row_cnt, None)
         self.group = group
 
     def __str__(self) -> str:

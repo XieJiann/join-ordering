@@ -116,7 +116,6 @@ class AssocRule(Rule):
             top_join.row_cnt,
             None,
         )
-
         return [new_top_join]
 
 

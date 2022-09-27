@@ -1,3 +1,4 @@
+from typing import Tuple
 from columbia.memo.memo import Memo
 from columbia.memo.context import Context
 from columbia.memo.properties import PropertySet
@@ -6,7 +7,7 @@ from columbia.task.task import O_Group
 from plan.plan import Plan
 
 
-def optimize(plan: Plan) -> Plan:
+def optimize(plan: Plan) -> Tuple[Plan, float]:
     memo = Memo(plan)
     rule_set = RuleSet()
     context = Context(memo, float("inf"), rule_set, PropertySet(), [])
