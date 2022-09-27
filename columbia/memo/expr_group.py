@@ -2,27 +2,18 @@ from itertools import chain, product
 from typing import Any, List, Optional, Tuple
 from columbia.memo.properties import PropertySet
 from columbia.rule.rule import Rule
-from plan.plan import LogicalType, OpType, Plan
+from plan.plan import LogicalType, OpType, Plan, PlanContent
+from columbia.cost.statistics import LogicalProfile
 
 
-class Expr:
-    def __init__(
-        self,
-        type: OpType,
-        children: Tuple["Group", ...],
-        group: Optional["Group"],
-        name: Optional[str],
-        row_cnt: int,
-    ) -> None:
+class GroupExpr:
+    def __init__(self, children: Tuple["Group", ...], content: PlanContent) -> None:
         """
-        The Expr is the basic node in optimizer
+        The GroupExpr is the basic node in optimizer
         """
-        self.type = type
+        self.content = content
         self.children = children
         self.rule_mask = 0
-        self.group = group
-        self.name = name
-        self.row_cnt = row_cnt
 
     def set_applied(self, rule: Rule) -> None:
         self.rule_mask |= 1 << rule.id
@@ -31,16 +22,16 @@ class Expr:
         return (self.rule_mask & (1 << rule.id)) != 0
 
     def is_logical(self) -> bool:
-        return self.type.is_logical()
+        return self.content.op_type.is_logical()
 
-    def set_group(self, group: "Group") -> "Expr":
+    def set_group(self, group: "Group") -> "GroupExpr":
         self.group = group
         return self
 
     def set_children(
         self,
         children: "Tuple[Group,...]",
-    ) -> "Expr":
+    ) -> "GroupExpr":
         self.children = children
         return self
 
@@ -54,46 +45,50 @@ class Expr:
     def is_leaf(self) -> bool:
         return self.children == ()
 
-    def copy(self) -> "Expr":
-        return Expr(self.type, self.children, self.group, self.name, self.row_cnt)
+    def copy(self) -> "GroupExpr":
+        return GroupExpr(self.children, self.content)
 
     def all_plan(self) -> List[Plan]:
-        group_plans = map(lambda g: g.all_plan(self.type.is_logical()), self.children)
+        group_plans = map(lambda g: g.all_plan(self.is_logical()), self.children)
         return [
-            Plan(children, self.type, self.row_cnt, self.name)
+            Plan.from_content(children, self.content)
             for children in product(*group_plans)
         ]
 
+    def type(self) -> OpType:
+        return self.content.op_type
+
     def __hash__(self) -> int:
-        return hash((self.type, self.name, self.children))
+        return hash((self.content, self.children))
 
     def __eq__(self, __o: object) -> bool:
         return hash(self) == hash(__o)
 
     def __str__(self) -> str:
-        if self.name is None:
-            return str(self.type)
-        return str(self.type) + self.name
+        return str(self.content)
+
+    def is_derived(self) -> bool:
+        return self.group.is_derived()
 
 
 class Group:
     def __init__(self, gid: int) -> None:
         self.gid = gid
-        self.logical_exprs: List[Expr] = []
-        self.physical_exprs: List[Expr] = []
+        self.logical_exprs: List[GroupExpr] = []
+        self.physical_exprs: List[GroupExpr] = []
 
         self.explored = False
         # the winner matain the idx of the expr with the lowest cost
-        self.winner: Optional[Tuple[Expr, float]] = None
+        self.winner: Optional[Tuple[GroupExpr, float]] = None
 
-        self.row_cnt = None
+        self.logical_profile = LogicalProfile()
 
         self.cost_lower_bound = -1  # useless?
 
     def set_explored(self) -> None:
         self.explored = True
 
-    def record_expr(self, expr: Expr) -> None:
+    def record_expr(self, expr: GroupExpr) -> None:
         if expr.is_logical():
             self.logical_exprs.append(expr)
         else:
@@ -104,29 +99,34 @@ class Group:
         assert property_set.is_empty()
         return self.winner != None
 
-    def winner_cost(self) -> float:
+    def winner_cost(self, property_set: PropertySet) -> float:
         assert self.winner is not None
         return self.winner[1]
 
-    def set_winner(self, property_set: PropertySet, expr: Expr, cost: float):
-        if not self.has_winner(property_set) or self.winner_cost() > cost:
+    def set_winner(self, property_set: PropertySet, expr: GroupExpr, cost: float):
+        if not self.has_winner(property_set) or self.winner_cost(property_set) > cost:
             self.winner = (expr, cost)
 
-    def get_winner_plan(self, property_set: PropertySet) -> Plan:
+    def winner_plan(self, property_set: PropertySet) -> Plan:
         assert self.winner is not None
         winner_expr = self.winner[0]
         children = tuple(
-            map(lambda g: g.get_winner_plan(property_set), winner_expr.children)
+            map(lambda g: g.winner_plan(property_set), winner_expr.children)
         )
-        return Plan(children, winner_expr.type, winner_expr.row_cnt, winner_expr.name)
+        return Plan.from_content(children, winner_expr.content)
 
-    def all_exprs(self) -> List[Expr]:
+    def all_exprs(self) -> List[GroupExpr]:
         return self.logical_exprs + self.physical_exprs
 
     def all_plan(self, logical: bool) -> List[Plan]:
         if logical:
             return list(chain(*map(lambda e: e.all_plan(), self.logical_exprs)))
         return list(chain(*map(lambda e: e.all_plan(), self.physical_exprs)))
+
+    def get_promise_expr(self):
+        # This function return the expr with highest promise for stats derived
+        # That is with the smallest expression
+        return min(self.logical_exprs, key=lambda e: e.content.cost_promise())
 
     def __hash__(self) -> int:
         return self.gid
@@ -139,10 +139,15 @@ class Group:
             tuple(map(lambda expr: str(expr), self.logical_exprs + self.physical_exprs))
         )
 
+    def is_derived(self) -> bool:
+        return self.logical_profile.frequency is None
+
 
 class LeafGroup(Plan):
     def __init__(self, group: Group) -> None:
-        super().__init__((), LogicalType.Leaf, -1, None)
+        super().__init__(
+            (), LogicalType.Leaf, group.logical_exprs[0].content.expression
+        )
         self.group = group
 
     def __str__(self) -> str:

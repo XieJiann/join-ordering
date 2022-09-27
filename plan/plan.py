@@ -1,6 +1,6 @@
 from enum import Enum, auto
-from typing import Any, List, Optional, Tuple
-import unittest
+from typing import Any, List, Tuple
+from plan.expr import Expression
 
 
 def tree_printer(tree: Tuple[str, Tuple[Any, ...]]) -> str:
@@ -32,7 +32,7 @@ class OpType(Enum):
 
 class LogicalType(OpType):
     InnerJoin = auto()
-    Table = auto()
+    Get = auto()
     Leaf = auto()
 
     def is_logical(self) -> bool:
@@ -44,26 +44,39 @@ class PhyiscalType(OpType):
     Scan = auto()
 
 
-class Plan:
-    def __init__(
-        self,
-        children: Tuple["Plan", ...],
-        op_type: OpType,
-        row_cnt: int,
-        name: Optional[str],
-    ) -> None:
-        self.children: Tuple[Plan, ...] = children
+class PlanContent:
+    def __init__(self, op_type: OpType, expression: Expression) -> None:
         self.op_type = op_type
-        self.name = name
-        self.row_cnt = row_cnt
+        self.expression = expression
 
-    def copy(self) -> "Plan":
-        return Plan(self.children, self.op_type, self.row_cnt, self.name)
+    def cost_promise(self) -> float:
+        return 1 / self.expression.count()
 
     def __str__(self) -> str:
-        if self.name is not None:
-            return self.name
-        return str(self.op_type)
+        if self.op_type == LogicalType.Get or self.op_type == PhyiscalType.Scan:
+            return str(self.expression.columns[0].source)
+        return str(self.op_type).split(".")[-1]
+
+    def __hash__(self) -> int:
+        return hash((self.op_type, self.expression))
+
+
+class Plan:
+    def __init__(
+        self, children: Tuple["Plan", ...], op_type: OpType, expression: Expression
+    ) -> None:
+        self.children: Tuple[Plan, ...] = children
+        self.content = PlanContent(op_type, expression)
+
+    @staticmethod
+    def from_content(children: Tuple["Plan", ...], content: PlanContent) -> "Plan":
+        return Plan(children, content.op_type, content.expression)
+
+    def copy(self) -> "Plan":
+        return Plan.from_content(self.children, self.content)
+
+    def __str__(self) -> str:
+        return str(self.content)
 
     def set_children(self, children: Tuple["Plan", ...]) -> "Plan":
         self.children = children
@@ -77,32 +90,9 @@ class LogicalPlanBuilder:
     def __init__(self, table: Plan) -> None:
         self.root = table
 
-    def join(self, plan: Plan) -> "LogicalPlanBuilder":
-        self.root = Plan(
-            (self.root, plan),
-            LogicalType.InnerJoin,
-            self.root.row_cnt * plan.row_cnt,
-            None,
-        )
+    def join(self, plan: Plan, expression: Expression) -> "LogicalPlanBuilder":
+        self.root = Plan((self.root, plan), LogicalType.InnerJoin, expression)
         return self
 
     def build(self) -> Plan:
         return self.root
-
-
-class TestPlan(unittest.TestCase):
-    def test_plan(self) -> None:
-        left = (
-            LogicalPlanBuilder(Plan((), LogicalType.Table, 100, "t1"))
-            .join(Plan((), LogicalType.Table, 200, "t2"))
-            .build()
-        )
-
-        right = (
-            LogicalPlanBuilder(Plan((), LogicalType.Table, 300, "t3"))
-            .join(Plan((), LogicalType.Table, 400, "t4"))
-            .build()
-        )
-
-        plan = LogicalPlanBuilder(left).join(right).build()
-        print(tree_printer(plan.to_tree()))

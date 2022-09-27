@@ -1,7 +1,6 @@
 import itertools
 from typing import List
-import unittest
-from columbia.memo.expr_group import Expr, Group, LeafGroup
+from columbia.memo.expr_group import GroupExpr, Group, LeafGroup
 from columbia.rule.pattern import (
     PatternType,
     match_root,
@@ -12,7 +11,7 @@ from plan.plan import LogicalType, Plan
 
 
 class ExprBinder:
-    def __init__(self, expr: Expr, pattern: PatternType) -> None:
+    def __init__(self, expr: GroupExpr, pattern: PatternType) -> None:
         self.expr = expr
         self.cur_idx = 0
         self.permutaion = [()]
@@ -38,9 +37,7 @@ class ExprBinder:
             for i, j in enumerate(self.permutaion[self.cur_idx]):
                 children.append(self.children_plan[i][j])
             self.cur_idx += 1
-            return Plan(
-                tuple(children), self.expr.type, self.expr.row_cnt, self.expr.name
-            )
+            return Plan.from_content(tuple(children), self.expr.content)
         else:
             raise StopIteration
 
@@ -60,8 +57,3 @@ class GroupBinder:
 
     def all_plan(self) -> List[Plan]:
         return self.plan
-
-
-class TestBinder(unittest.TestCase):
-    def test_binder(self) -> None:
-        pass

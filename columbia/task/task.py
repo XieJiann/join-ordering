@@ -1,6 +1,6 @@
 from loguru import logger
-from columbia.cost.cost import cost_for_expr
-from columbia.memo.expr_group import Expr, Group
+from columbia.cost.cost_model import cost_for_expr
+from columbia.memo.expr_group import GroupExpr, Group
 from columbia.memo.context import Context
 from columbia.rule.rule import Rule
 from columbia.rule.pattern import match_root, pattern_children
@@ -51,7 +51,7 @@ class E_Group(Task):
 
 class O_Expr(Task):
     def __init__(
-        self, expr: Expr, context: Context, exploring: bool, level: int
+        self, expr: GroupExpr, context: Context, exploring: bool, level: int
     ) -> None:
         self.context = context
         self.expr = expr
@@ -91,7 +91,7 @@ class O_Expr(Task):
 
 
 class O_Inputs(Task):
-    def __init__(self, expr: Expr, context: Context, level: int) -> None:
+    def __init__(self, expr: GroupExpr, context: Context, level: int) -> None:
         self.context = context
         self.expr = expr
         self.cur_child_idx = -1
@@ -106,6 +106,7 @@ class O_Inputs(Task):
         )
 
         if self.cur_child_idx == -1:
+            # [TODO]: Add task derivastats
             self.cur_total_cost = cost_for_expr(self.expr)
             if self.cur_total_cost > self.context.cost_upper_bound:
                 return
@@ -115,7 +116,9 @@ class O_Inputs(Task):
         for child_group in self.expr.children[last_optimized:]:
             if child_group.has_winner(self.context.property_set):
                 self.cur_child_idx += 1
-                self.cur_total_cost += child_group.winner_cost()
+                self.cur_total_cost += child_group.winner_cost(
+                    self.context.property_set
+                )
                 if self.cur_total_cost > self.context.cost_upper_bound:
                     return
             elif self.prev_child_idx != self.cur_child_idx:
@@ -136,6 +139,7 @@ class O_Inputs(Task):
                 )
                 return
             else:
+                # pruning
                 break
 
         if self.cur_child_idx == len(self.expr.children):
@@ -149,7 +153,7 @@ class O_Inputs(Task):
 
 class ApplyRule(Task):
     def __init__(
-        self, expr: Expr, rule: Rule, context: Context, exploring: bool, level: int
+        self, expr: GroupExpr, rule: Rule, context: Context, exploring: bool, level: int
     ) -> None:
         self.context = context
         self.expr = expr
@@ -173,12 +177,37 @@ class ApplyRule(Task):
             for new_plan in transformed_plans:
                 expr, is_new = self.context.memo.record_plan(new_plan, self.expr.group)
                 if is_new:
-                    if expr.type.is_logical():
+                    if expr.content.op_type.is_logical():
                         self.context.push_task(
                             O_Expr(expr, self.context, self.exploring, self.level + 1)
+                        )
+                        self.context.push_task(
+                            DeriveStats(expr, self.context, self.level + 1)
                         )
                     else:
                         self.context.push_task(
                             O_Inputs(expr, self.context, self.level + 1)
                         )
+
         self.expr.set_applied(self.rule)
+
+
+class DeriveStats(Task):
+    def __init__(self, expr: GroupExpr, context: Context, level: int = 0) -> None:
+        self.expr = expr
+        self.context = context
+        self.children_derived = False
+        self.level = level
+
+    def execute(self) -> None:
+        ident = "\t" * self.level
+        logger.debug(f"{ident}DeriveStats {self.expr}")
+        if not self.children_derived:
+            self.children_derived = True
+            self.context.push_task(self)
+            for child in self.expr.children:
+                self.context.push_task(
+                    DeriveStats(child.get_promise_expr(), self.context, self.level + 1)
+                )
+        else:
+            self.context.stats_calculator.estimate(self.expr)

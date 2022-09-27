@@ -103,20 +103,17 @@ class AssocRule(Rule):
         """
         top_join = input
         left_join = input.children[0]
-        assert left_join.op_type == LogicalType.InnerJoin
+        assert left_join.content.op_type == LogicalType.InnerJoin
         right_join = Plan(
             (left_join.children[1], top_join.children[1]),
             LogicalType.InnerJoin,
-            left_join.children[1].row_cnt * top_join.children[1].row_cnt,
-            None,
+            left_join.content.expression,
         )
         new_top_join = Plan(
             (left_join.children[0], right_join),
             LogicalType.InnerJoin,
-            top_join.row_cnt,
-            None,
+            top_join.content.expression,
         )
-
         return [new_top_join]
 
 
@@ -133,17 +130,17 @@ class NSLRule(Rule):
         return True
 
     def transform(self, input: Plan) -> List[Plan]:
-        return [Plan(input.children, PhyiscalType.NSLJoin, input.row_cnt, input.name)]
+        return [Plan(input.children, PhyiscalType.NSLJoin, input.content.expression)]
 
 
 class ScanRule(Rule):
     def __init__(self) -> None:
         super().__init__(2, RuleType.Physical)
-        self.pattern: PatternType = (LogicalType.Table, ())
+        self.pattern: PatternType = (LogicalType.Get, ())
         self.name = "ScanRule"
 
     def check(self, expr: Plan) -> bool:
         return True
 
     def transform(self, input: Plan) -> List[Plan]:
-        return [Plan(input.children, PhyiscalType.Scan, input.row_cnt, input.name)]
+        return [Plan(input.children, PhyiscalType.Scan, input.content.expression)]
