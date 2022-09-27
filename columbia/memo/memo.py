@@ -1,5 +1,5 @@
 from typing import List, Optional, Tuple
-from columbia.memo.expr_group import Expr, Group, LeafGroup
+from columbia.memo.expr_group import GroupExpr, Group, LeafGroup
 from columbia.memo.properties import PropertySet
 from plan.plan import Plan, tree_printer
 
@@ -8,7 +8,7 @@ class Memo:
     def __init__(self, plan: Plan) -> None:
         # root always in the front
         self.groups: List["Group"] = []
-        self.expr_dict: "dict[Expr, Group]" = {}
+        self.expr_dict: "dict[GroupExpr, Group]" = {}
         self.root = self.record_plan(plan, None)[0].get_group()
 
     def new_group(self) -> Group:
@@ -16,7 +16,7 @@ class Memo:
         self.groups.append(group)
         return group
 
-    def record_plan(self, plan: Plan, group: Optional[Group]) -> Tuple[Expr, bool]:
+    def record_plan(self, plan: Plan, group: Optional[Group]) -> Tuple[GroupExpr, bool]:
         """
         args: we should record the plan into this group. if group is None, we need to construct a new group
         return: The first element is the expr of this plan, and the second element represent whether the expr is new
@@ -28,7 +28,7 @@ class Memo:
         group_children = map(
             lambda p: self.record_plan(p, None)[0].get_group(), plan.children
         )
-        expr = Expr(plan.op_type, tuple(group_children), None, plan.name, plan.row_cnt)
+        expr = GroupExpr(tuple(group_children), plan.content)
         if expr in self.expr_dict:
             expr.set_group(self.expr_dict[expr])
             return (expr, False)

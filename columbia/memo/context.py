@@ -1,4 +1,5 @@
 from typing import List
+from columbia.cost.calculator import StatsCalculator
 from columbia.memo.memo import Memo
 from columbia.memo.properties import PropertySet
 from columbia.rule.rule import RuleSet
@@ -13,6 +14,7 @@ class Context:
         rule_set: RuleSet,
         property_set: PropertySet,
         task_stack: List[Task],
+        stats_calculator: StatsCalculator,
     ) -> None:
         # cost_upper_bound init with the bigest value, e.g., 1e10
         self.cost_upper_bound: float = cost_upper_bound
@@ -21,6 +23,7 @@ class Context:
         self.properties = None
         self.memo = memo
         self.property_set = property_set
+        self.stats_calculator = stats_calculator
 
     def push_task(self, task: Task) -> None:
         self.task_stack.append(task)
@@ -38,4 +41,5 @@ class Context:
             self.rule_set,
             self.property_set,
             self.task_stack,
+            self.stats_calculator,
         )

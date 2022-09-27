@@ -1,11 +1,11 @@
 from typing import Tuple
-from columbia.memo.expr_group import Expr
+from columbia.memo.expr_group import GroupExpr
 from columbia.rule.rule import PatternType
 from plan.plan import OpType
 
 
-def match_root(pattern: PatternType, expr: Expr) -> bool:
-    return pattern[0] == expr.type
+def match_root(pattern: PatternType, expr: GroupExpr) -> bool:
+    return pattern[0] == expr.content.op_type
 
 
 def pattern_root(pattern: PatternType) -> OpType:
