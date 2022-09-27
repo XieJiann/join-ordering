@@ -20,6 +20,8 @@ class LogicalProfile:
     def set_stats(self, col: Column, frequency: float) -> None:
         # Right now, we only support frequency
         self.profile[col] = Statistic(0, 0, frequency, (0, 0))
+        if self.frequency != None:
+            assert self.frequency == frequency
         self.frequency = frequency
 
     def get_stats(self, col: Column) -> Statistic:
