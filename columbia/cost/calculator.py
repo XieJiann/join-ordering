@@ -1,3 +1,4 @@
+from catalog.catalog import Column
 from columbia.memo.expr_group import GroupExpr
 from plan.expr import ExpressionType
 from plan.plan import LogicalType
@@ -8,8 +9,6 @@ class StatsCalculator:
         return
 
     def estimate(self, expr: GroupExpr):
-        # Maybe a visitor is better than pattern match
-        # However, we don't implenment a type for each expr
         match expr.type():
             case LogicalType.InnerJoin:
                 self.estimate_inner_join(expr)
@@ -19,7 +18,7 @@ class StatsCalculator:
                 assert False, f"Unknown expression {expr.type()} when estimate stats"
 
     def estimate_inner_join(self, expr: GroupExpr):
-        assert expr.content.expression.type == ExpressionType.ConstantVal
+        assert expr.content.expressions[0].type == ExpressionType.ConstantVal
         for l_col, l_stat in expr.children[0].logical_profile.profile.items():
             for r_col, r_stat in expr.children[1].logical_profile.profile.items():
                 expr.group.logical_profile.set_stats(
@@ -29,8 +28,8 @@ class StatsCalculator:
                     r_col, l_stat.frequency * r_stat.frequency
                 )
 
-    def estimate_get(self, expr: GroupExpr):
-        columns = expr.content.expression.columns
-        assert len(columns) != 0
-        for col in columns:
-            expr.group.logical_profile.set_stats(col, col.frequency())
+    def estimate_get(self, group_expr: GroupExpr):
+        for expr in group_expr.content.expressions:
+            col = expr.context
+            assert isinstance(col, Column)
+            group_expr.group.logical_profile.set_stats(col, col.frequency())

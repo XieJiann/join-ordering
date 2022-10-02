@@ -45,32 +45,35 @@ class PhyiscalType(OpType):
 
 
 class PlanContent:
-    def __init__(self, op_type: OpType, expression: Expression) -> None:
+    def __init__(self, op_type: OpType, expressions: Tuple[Expression, ...]) -> None:
         self.op_type = op_type
-        self.expression = expression
+        self.expressions = expressions
 
     def cost_promise(self) -> float:
-        return 1 / self.expression.count()
+        return 1 / sum(map(lambda e: e.count_exprs(), self.expressions))
 
     def __str__(self) -> str:
         if self.op_type == LogicalType.Get or self.op_type == PhyiscalType.Scan:
-            return str(self.expression.columns[0].source)
+            return str(self.expressions[0].context)
         return str(self.op_type).split(".")[-1]
 
     def __hash__(self) -> int:
-        return hash((self.op_type, self.expression))
+        return hash((self.op_type, self.expressions))
 
 
 class Plan:
     def __init__(
-        self, children: Tuple["Plan", ...], op_type: OpType, expression: Expression
+        self,
+        children: Tuple["Plan", ...],
+        op_type: OpType,
+        expression: Tuple[Expression, ...],
     ) -> None:
         self.children: Tuple[Plan, ...] = children
         self.content = PlanContent(op_type, expression)
 
     @staticmethod
     def from_content(children: Tuple["Plan", ...], content: PlanContent) -> "Plan":
-        return Plan(children, content.op_type, content.expression)
+        return Plan(children, content.op_type, content.expressions)
 
     def copy(self) -> "Plan":
         return Plan.from_content(self.children, self.content)
@@ -90,8 +93,10 @@ class LogicalPlanBuilder:
     def __init__(self, table: Plan) -> None:
         self.root = table
 
-    def join(self, plan: Plan, expression: Expression) -> "LogicalPlanBuilder":
-        self.root = Plan((self.root, plan), LogicalType.InnerJoin, expression)
+    def join(
+        self, plan: Plan, expressions: Tuple[Expression, ...]
+    ) -> "LogicalPlanBuilder":
+        self.root = Plan((self.root, plan), LogicalType.InnerJoin, expressions)
         return self
 
     def build(self) -> Plan:

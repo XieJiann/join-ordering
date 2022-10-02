@@ -146,7 +146,7 @@ class Group:
 class LeafGroup(Plan):
     def __init__(self, group: Group) -> None:
         super().__init__(
-            (), LogicalType.Leaf, group.logical_exprs[0].content.expression
+            (), LogicalType.Leaf, group.logical_exprs[0].content.expressions
         )
         self.group = group
 

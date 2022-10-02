@@ -107,12 +107,12 @@ class AssocRule(Rule):
         right_join = Plan(
             (left_join.children[1], top_join.children[1]),
             LogicalType.InnerJoin,
-            left_join.content.expression,
+            left_join.content.expressions,
         )
         new_top_join = Plan(
             (left_join.children[0], right_join),
             LogicalType.InnerJoin,
-            top_join.content.expression,
+            top_join.content.expressions,
         )
         return [new_top_join]
 
@@ -130,7 +130,7 @@ class NSLRule(Rule):
         return True
 
     def transform(self, input: Plan) -> List[Plan]:
-        return [Plan(input.children, PhyiscalType.NSLJoin, input.content.expression)]
+        return [Plan(input.children, PhyiscalType.NSLJoin, input.content.expressions)]
 
 
 class ScanRule(Rule):
@@ -143,4 +143,4 @@ class ScanRule(Rule):
         return True
 
     def transform(self, input: Plan) -> List[Plan]:
-        return [Plan(input.children, PhyiscalType.Scan, input.content.expression)]
+        return [Plan(input.children, PhyiscalType.Scan, input.content.expressions)]
