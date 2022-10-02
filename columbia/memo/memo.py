@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple
 from columbia.memo.expr_group import GroupExpr, Group, LeafGroup
-from columbia.memo.properties import PropertySet
+from plan.properties import PropertySet
 from plan.plan import Plan, tree_printer
 
 

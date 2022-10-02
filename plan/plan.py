@@ -40,7 +40,8 @@ class LogicalType(OpType):
 
 
 class PhyiscalType(OpType):
-    NSLJoin = auto()
+    NLJoin = auto()
+    HashJoin = auto()
     Scan = auto()
 
 

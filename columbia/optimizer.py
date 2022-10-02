@@ -2,7 +2,7 @@ from typing import Tuple
 from columbia.cost.calculator import StatsCalculator
 from columbia.memo.memo import Memo
 from columbia.memo.context import Context
-from columbia.memo.properties import PropertySet
+from plan.properties import PropertySet
 from columbia.rule.rule import RuleSet
 from columbia.task.task import DeriveStats, O_Group
 from plan.plan import Plan

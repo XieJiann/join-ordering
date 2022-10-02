@@ -1,7 +1,7 @@
 from typing import List
 from columbia.cost.calculator import StatsCalculator
 from columbia.memo.memo import Memo
-from columbia.memo.properties import PropertySet
+from plan.properties import PropertySet
 from columbia.rule.rule import RuleSet
 from columbia.task.abstract_task import Task
 

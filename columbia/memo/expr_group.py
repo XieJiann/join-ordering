@@ -1,6 +1,6 @@
 from itertools import chain, product
-from typing import Any, List, Optional, Tuple
-from columbia.memo.properties import PropertySet
+from typing import Any, Dict, List, Tuple
+from plan.properties import PropertySet
 from columbia.rule.rule import Rule
 from plan.plan import LogicalType, OpType, Plan, PlanContent
 from columbia.cost.statistics import LogicalProfile
@@ -79,7 +79,7 @@ class Group:
 
         self.explored = False
         # the winner matain the idx of the expr with the lowest cost
-        self.winner: Optional[Tuple[GroupExpr, float]] = None
+        self.winner: Dict[PropertySet, Tuple[GroupExpr, float]] = {}
 
         self.logical_profile = LogicalProfile()
 
@@ -95,21 +95,19 @@ class Group:
             self.physical_exprs.append(expr)
 
     def has_winner(self, property_set: PropertySet) -> bool:
-        # The properties has not been supported yet
-        assert property_set.is_empty()
-        return self.winner != None
+        return property_set in self.winner
 
     def winner_cost(self, property_set: PropertySet) -> float:
-        assert self.winner is not None
-        return self.winner[1]
+        assert self.has_winner(property_set)
+        return self.winner[property_set][1]
 
     def set_winner(self, property_set: PropertySet, expr: GroupExpr, cost: float):
         if not self.has_winner(property_set) or self.winner_cost(property_set) > cost:
-            self.winner = (expr, cost)
+            self.winner[property_set] = (expr, cost)
 
     def winner_plan(self, property_set: PropertySet) -> Plan:
-        assert self.winner is not None
-        winner_expr = self.winner[0]
+        assert property_set in self.winner
+        winner_expr = self.winner[property_set][0]
         children = tuple(
             map(lambda g: g.winner_plan(property_set), winner_expr.children)
         )
@@ -125,7 +123,7 @@ class Group:
 
     def get_promise_expr(self):
         # This function return the expr with highest promise for stats derived
-        # That is with the smallest expression
+        # That is with the least expression
         return min(self.logical_exprs, key=lambda e: e.content.cost_promise())
 
     def __hash__(self) -> int:
