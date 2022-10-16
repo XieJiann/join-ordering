@@ -1,6 +1,7 @@
 from enum import Enum, auto
 from typing import Any, List, Tuple
 from plan.expr import Expression
+from plan.properties import PropertySet, PropertyType, Property
 
 
 def tree_printer(tree: Tuple[str, Tuple[Any, ...]]) -> str:
@@ -29,6 +30,9 @@ class OpType(Enum):
     def is_logical(self) -> bool:
         return False
 
+    def is_enforcer(self) -> bool:
+        return False
+
 
 class LogicalType(OpType):
     InnerJoin = auto()
@@ -45,6 +49,14 @@ class PhyiscalType(OpType):
     Scan = auto()
 
 
+class EnforceType(OpType):
+    Sort = auto()
+    Hash = auto()
+
+    def is_enforcer(self):
+        return True
+
+
 class PlanContent:
     def __init__(self, op_type: OpType, expressions: Tuple[Expression, ...]) -> None:
         self.op_type = op_type
@@ -52,6 +64,13 @@ class PlanContent:
 
     def cost_promise(self) -> float:
         return 1 / sum(map(lambda e: e.count_exprs(), self.expressions))
+
+    def contain(self, expressions: Tuple[Expression, ...]):
+        # TODO: Add hash table to boost this procedure
+        for expr in expressions:
+            if expr not in self.expressions:
+                return False
+        return True
 
     def __str__(self) -> str:
         if self.op_type == LogicalType.Get or self.op_type == PhyiscalType.Scan:
@@ -93,6 +112,7 @@ class Plan:
 class LogicalPlanBuilder:
     def __init__(self, table: Plan) -> None:
         self.root = table
+        self.properties = PropertySet()
 
     def join(
         self, plan: Plan, expressions: Tuple[Expression, ...]
@@ -100,5 +120,9 @@ class LogicalPlanBuilder:
         self.root = Plan((self.root, plan), LogicalType.InnerJoin, expressions)
         return self
 
-    def build(self) -> Plan:
-        return self.root
+    def build(self):
+        return self.root, self.properties
+
+    def order_by(self, expressions: Tuple[Expression, ...]) -> "LogicalPlanBuilder":
+        self.properties.add_property(Property(PropertyType.Sort, expressions))
+        return self

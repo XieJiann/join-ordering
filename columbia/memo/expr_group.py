@@ -1,5 +1,6 @@
 from itertools import chain, product
 from typing import Any, Dict, List, Tuple
+from plan.expr import Expression
 from plan.properties import PropertySet
 from columbia.rule.rule import Rule
 from plan.plan import LogicalType, OpType, Plan, PlanContent
@@ -14,15 +15,40 @@ class GroupExpr:
         self.content = content
         self.children = children
         self.rule_mask = 0
+        """
+        This map maps the outputproperty with input property, note it's only valid for physical operator
+        It's init in optimize_input task
+        It's used when choose the best plan, that is we shound select the best child plan according the input property set
+        XJ: 
+            Do we need a map, in fact I think a physiacl g_expr can only output one property, therefore a pair maybe enough
+        """
+        self.property_map: Dict[PropertySet, Tuple[PropertySet, ...]] = {}
 
     def set_applied(self, rule: Rule) -> None:
         self.rule_mask |= 1 << rule.id
+
+    def get_input_property(self, prop: PropertySet):
+        assert prop in self.property_map, f"{str(self)} has no input of {prop}"
+        return self.property_map[prop]
+
+    def set_property(
+        self,
+        output_property: PropertySet,
+        input_property: Tuple[PropertySet, ...],
+    ):
+        # print(
+        #     f"set property {output_property} <- {tuple(map(lambda k:str(k), input_property))} for {str(self)}"
+        # )
+        self.property_map[output_property] = input_property
 
     def applied(self, rule: Rule) -> bool:
         return (self.rule_mask & (1 << rule.id)) != 0
 
     def is_logical(self) -> bool:
         return self.content.op_type.is_logical()
+
+    def is_enforcer(self) -> bool:
+        return self.content.op_type.is_enforcer()
 
     def set_group(self, group: "Group") -> "GroupExpr":
         self.group = group
@@ -55,6 +81,9 @@ class GroupExpr:
             for children in product(*group_plans)
         ]
 
+    def contain(self, expressions: Tuple[Expression, ...]):
+        return self.content.contain(expressions)
+
     def type(self) -> OpType:
         return self.content.op_type
 
@@ -65,7 +94,7 @@ class GroupExpr:
         return hash(self) == hash(__o)
 
     def __str__(self) -> str:
-        return str(self.content)
+        return str(self.content) + "_" + str(self.group.gid)
 
     def is_derived(self) -> bool:
         return self.group.is_derived()
@@ -76,7 +105,7 @@ class Group:
         self.gid = gid
         self.logical_exprs: List[GroupExpr] = []
         self.physical_exprs: List[GroupExpr] = []
-
+        self.enforce_exprs: List[GroupExpr] = []
         self.explored = False
         # the winner matain the idx of the expr with the lowest cost
         self.winner: Dict[PropertySet, Tuple[GroupExpr, float]] = {}
@@ -89,29 +118,45 @@ class Group:
         self.explored = True
 
     def record_expr(self, expr: GroupExpr) -> None:
+        expr.set_group(self)
         if expr.is_logical():
             self.logical_exprs.append(expr)
+        elif expr.is_enforcer():
+            self.enforce_exprs.append(expr)
         else:
             self.physical_exprs.append(expr)
 
     def has_winner(self, property_set: PropertySet) -> bool:
-        return property_set in self.winner
+        return property_set in self.winner.keys()
 
     def winner_cost(self, property_set: PropertySet) -> float:
         assert self.has_winner(property_set)
         return self.winner[property_set][1]
 
     def set_winner(self, property_set: PropertySet, expr: GroupExpr, cost: float):
+        # print(f"set winner {property_set} in {self.gid} is {str(expr)}")
         if not self.has_winner(property_set) or self.winner_cost(property_set) > cost:
             self.winner[property_set] = (expr, cost)
 
     def winner_plan(self, property_set: PropertySet) -> Plan:
-        assert property_set in self.winner
+        assert (
+            property_set in self.winner
+        ), f"{property_set} has not been optimized in {self.gid}"
         winner_expr = self.winner[property_set][0]
-        children = tuple(
-            map(lambda g: g.winner_plan(property_set), winner_expr.children)
-        )
-        return Plan.from_content(children, winner_expr.content)
+        if winner_expr.is_enforcer():
+            plan = self.winner_plan(winner_expr.get_input_property(property_set)[0])
+            plan = Plan.from_content((plan,), winner_expr.content)
+        else:
+            children_prop = winner_expr.get_input_property(property_set)
+            assert len(children_prop) == len(winner_expr.children)
+            children = tuple(
+                map(
+                    lambda i: winner_expr.children[i].winner_plan(children_prop[i]),
+                    range(len(children_prop)),
+                )
+            )
+            plan = Plan.from_content(children, winner_expr.content)
+        return plan
 
     def all_exprs(self) -> List[GroupExpr]:
         return self.logical_exprs + self.physical_exprs
@@ -133,8 +178,17 @@ class Group:
         return self.gid == hash(__o)
 
     def __str__(self) -> str:
-        return str(
-            tuple(map(lambda expr: str(expr), self.logical_exprs + self.physical_exprs))
+        return (
+            str(
+                tuple(
+                    map(
+                        lambda expr: str(expr),
+                        self.logical_exprs + self.physical_exprs + self.enforce_exprs,
+                    )
+                )
+            )
+            + "_"
+            + str(self.gid)
         )
 
     def is_derived(self) -> bool:

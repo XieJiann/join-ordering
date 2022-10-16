@@ -1,7 +1,8 @@
+import math
 from catalog.catalog import Column
 from columbia.memo.expr_group import GroupExpr
 from plan.expr import ExpressionType
-from plan.plan import LogicalType
+from plan.plan import EnforceType, LogicalType, PhyiscalType
 
 
 class StatsCalculator:
@@ -33,3 +34,25 @@ class StatsCalculator:
             col = expr.context
             assert isinstance(col, Column)
             group_expr.group.logical_profile.set_stats(col, col.frequency())
+
+
+class CostCalculator:
+    def __init__(self) -> None:
+        return
+
+    def estimate(self, expr: GroupExpr):
+        """
+        This function return the cost of this expr
+        """
+        n = expr.group.logical_profile.get_frequency()
+        match expr.type():
+            case PhyiscalType.NLJoin:
+                return n
+            case PhyiscalType.Scan:
+                return n
+            case EnforceType.Sort:
+                return n * math.log(n)
+            case EnforceType.Hash:
+                return n
+            case _:
+                assert False, f"Unknown expression {expr.type()} when estimate cost"

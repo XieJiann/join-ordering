@@ -33,3 +33,7 @@ class Expression:
 
     def __hash__(self) -> int:
         return hash((self.type, self.context, self.children))
+
+    def __eq__(self, __o: object) -> bool:
+        assert isinstance(__o, Expression)
+        return hash(self) == hash(__o)
