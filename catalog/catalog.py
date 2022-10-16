@@ -13,6 +13,9 @@ class Column:
         self.source = table
         self.column_idx = column_idx
 
+    def table(self):
+        return self.source
+
     def upper_bound(self) -> float:
         return 0
 
@@ -28,8 +31,12 @@ class Column:
     def __hash__(self) -> int:
         return hash((self.column_idx, self.source))
 
+    def __eq__(self, __o: object) -> bool:
+        assert isinstance(__o, Column)
+        return hash(self) == hash(__o)
+
     def __str__(self) -> str:
-        return str(self.source)
+        return f"<{str(self.source)}:{str(self.column_idx)}>"
 
 
 class Table:

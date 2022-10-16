@@ -1,4 +1,5 @@
 from typing import List, Optional, Tuple
+from catalog.catalog import Table
 from columbia.memo.expr_group import GroupExpr, Group, LeafGroup
 from plan.properties import PropertySet
 from plan.plan import Plan, tree_printer
@@ -11,8 +12,8 @@ class Memo:
         self.expr_dict: "dict[GroupExpr, Group]" = {}
         self.root = self.record_plan(plan, None)[0].get_group()
 
-    def new_group(self) -> Group:
-        group = Group(len(self.groups))
+    def new_group(self, tables: set[Table]) -> Group:
+        group = Group(len(self.groups), tables)
         self.groups.append(group)
         return group
 
@@ -33,7 +34,7 @@ class Memo:
             expr.set_group(self.expr_dict[expr])
             return (expr, False)
         if group is None:
-            group = self.new_group()
+            group = self.new_group(expr.derive_tables())
         group.record_expr(expr)
         self.expr_dict[expr] = group
         return (expr, True)

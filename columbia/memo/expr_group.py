@@ -1,6 +1,7 @@
+from functools import reduce
 from itertools import chain, product
 from typing import Any, Dict, List, Tuple
-from plan.expr import Expression
+from catalog.catalog import Table
 from plan.properties import PropertySet
 from columbia.rule.rule import Rule
 from plan.plan import LogicalType, OpType, Plan, PlanContent
@@ -30,6 +31,10 @@ class GroupExpr:
     def get_input_property(self, prop: PropertySet):
         assert prop in self.property_map, f"{str(self)} has no input of {prop}"
         return self.property_map[prop]
+
+    def derive_tables(self):
+        tables: set[Table] = self.content.tables()
+        return reduce(lambda a, b: a.union(b.tables), self.children, tables)
 
     def set_property(
         self,
@@ -81,9 +86,6 @@ class GroupExpr:
             for children in product(*group_plans)
         ]
 
-    def contain(self, expressions: Tuple[Expression, ...]):
-        return self.content.contain(expressions)
-
     def type(self) -> OpType:
         return self.content.op_type
 
@@ -101,7 +103,7 @@ class GroupExpr:
 
 
 class Group:
-    def __init__(self, gid: int) -> None:
+    def __init__(self, gid: int, tables: set[Table]) -> None:
         self.gid = gid
         self.logical_exprs: List[GroupExpr] = []
         self.physical_exprs: List[GroupExpr] = []
@@ -109,15 +111,17 @@ class Group:
         self.explored = False
         # the winner matain the idx of the expr with the lowest cost
         self.winner: Dict[PropertySet, Tuple[GroupExpr, float]] = {}
-
         self.logical_profile = LogicalProfile()
-
         self.cost_lower_bound = -1  # useless?
+        self.tables: set[Table] = tables
 
     def set_explored(self) -> None:
         self.explored = True
 
     def record_expr(self, expr: GroupExpr) -> None:
+        if len(self.tables) == 0:
+            # we init the tables when first record logical expr in this group
+            pass
         expr.set_group(self)
         if expr.is_logical():
             self.logical_exprs.append(expr)
@@ -196,6 +200,10 @@ class Group:
 
 
 class LeafGroup(Plan):
+    """
+    It's plan that represent a group ranther a expr
+    """
+
     def __init__(self, group: Group) -> None:
         super().__init__(
             (), LogicalType.Leaf, group.logical_exprs[0].content.expressions
