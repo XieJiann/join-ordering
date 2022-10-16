@@ -15,7 +15,7 @@ class Enforcer:
         self.requsted_prop = requsted_prop
         self.output_prop = output_prop
         self.child_group = child_group
-        # TODO: we only support the followinf rule:
+        # TODO: Support the following rule:
         #   order a -> group by a
         #   order a,b,c -> order by a,b
         # TODO: Support functional dependencies

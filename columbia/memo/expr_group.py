@@ -1,3 +1,4 @@
+from cmath import cos
 from functools import reduce
 from itertools import chain, product
 from typing import Any, Dict, List, Tuple
@@ -138,7 +139,7 @@ class Group:
         return self.winner[property_set][1]
 
     def set_winner(self, property_set: PropertySet, expr: GroupExpr, cost: float):
-        # print(f"set winner {property_set} in {self.gid} is {str(expr)}")
+        # print(f"set winner {property_set} in {self.gid} {str(expr)} with cost {cost}")
         if not self.has_winner(property_set) or self.winner_cost(property_set) > cost:
             self.winner[property_set] = (expr, cost)
 

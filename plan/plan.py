@@ -15,13 +15,18 @@ def tree_printer(tree: Tuple[str, Tuple[Any, ...]]) -> str:
             children.append(format_subtree(child))
 
         res: List[str] = []
-        res.append(f"{tree[0]} ──┬─── {children[0][0]}")
-        for sub_child in children[0][1:]:
-            res.append(f"{' '*len(tree[0])}   |    {sub_child}")
-        for child in children[1:]:
-            res.append(f"{' '*len(tree[0])}   └─── {child[0]}")
-            for sub_child in child[1:]:
+        if len(children) == 1:
+            res.append(f"{tree[0]} ────── {children[0][0]}")
+            for sub_child in children[0][1:]:
                 res.append(f"{' '*len(tree[0])}        {sub_child}")
+        else:
+            res.append(f"{tree[0]} ──┬─── {children[0][0]}")
+            for sub_child in children[0][1:]:
+                res.append(f"{' '*len(tree[0])}   |    {sub_child}")
+            for child in children[1:]:
+                res.append(f"{' '*len(tree[0])}   └─── {child[0]}")
+                for sub_child in child[1:]:
+                    res.append(f"{' '*len(tree[0])}        {sub_child}")
         return res
 
     res = format_subtree(tree)
