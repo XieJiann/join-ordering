@@ -28,6 +28,9 @@ class Column:
     def __hash__(self) -> int:
         return hash((self.column_idx, self.source))
 
+    def __str__(self) -> str:
+        return str(self.source)
+
 
 class Table:
     def __init__(

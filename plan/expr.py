@@ -1,6 +1,5 @@
 from enum import Enum, auto
-from typing import Any, List, Optional, Tuple
-from catalog.catalog import Column
+from typing import Any, Optional, Tuple
 
 
 class ExpressionType(Enum):
@@ -13,18 +12,28 @@ class Expression:
         self,
         e_type: ExpressionType,
         children: Tuple["Expression", ...],
-        columns: List[Column],
-        constant_val: Optional[Any],
+        context: Optional[Any],
     ) -> None:
-        self.columns = columns
+        """
+        Each expression return a column value with the same type
+        The context is for some constant value for
+        """
         self.type = e_type
         self.children = children
-        self.constant_val = constant_val
+        self.context = context
 
-    def count(self) -> int:
+    def count_exprs(self) -> int:
+        """
+        This function is used to calculated the number of expression
+        And more expression brings lower promise due to the deviation
+        """
         if self.type == ExpressionType.ColumnRef:
             return 1
-        return sum(map(lambda e: e.count(), self.children)) + 1
+        return sum(map(lambda e: e.count_exprs(), self.children)) + 1
 
     def __hash__(self) -> int:
-        return hash((self.type, self.constant_val, tuple(self.columns), self.children))
+        return hash((self.type, self.context, self.children))
+
+    def __eq__(self, __o: object) -> bool:
+        assert isinstance(__o, Expression)
+        return hash(self) == hash(__o)

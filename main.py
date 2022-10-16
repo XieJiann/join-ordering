@@ -19,17 +19,18 @@ t5 = catalog.create_table("t5", {"v": DataType.Int32}, 5)
 t6 = catalog.create_table("t6", {"v": DataType.Int32}, 6)
 t7 = catalog.create_table("t7", {"v": DataType.Int32}, 7)
 
-plan: Plan = (
+plan, properties = (
     LogicalPlanBuilder(Plan((), LogicalType.Get, make_column_ref(t1, "v")))
     .join(Plan((), LogicalType.Get, make_column_ref(t3, "v")), make_true())
-    .join(Plan((), LogicalType.Get, make_column_ref(t7, "v")), make_true())
-    .join(Plan((), LogicalType.Get, make_column_ref(t2, "v")), make_true())
-    .join(Plan((), LogicalType.Get, make_column_ref(t6, "v")), make_true())
     .join(Plan((), LogicalType.Get, make_column_ref(t5, "v")), make_true())
-    .join(Plan((), LogicalType.Get, make_column_ref(t4, "v")), make_true())
+    # .join(Plan((), LogicalType.Get, make_column_ref(t2, "v")), make_true())
+    # .join(Plan((), LogicalType.Get, make_column_ref(t6, "v")), make_true())
+    # .join(Plan((), LogicalType.Get, make_column_ref(t4, "v")), make_true())
+    .order_by(make_column_ref(t3, "v"))
     .build()
 )
-if plan is not None:
-    winner, cost = c_optimizer.optimize(plan)
+
+assert plan is not None
+winner, cost = c_optimizer.optimize(plan, properties)
 print(cost)
 print(tree_printer(winner.to_tree()))

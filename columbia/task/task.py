@@ -1,11 +1,17 @@
+from cgitb import reset
+from typing import List, Tuple
 from loguru import logger
+from columbia.cost.calculator import CostCalculator
 from columbia.cost.cost_model import cost_for_expr
 from columbia.memo.expr_group import GroupExpr, Group
 from columbia.memo.context import Context
+from columbia.property.enforcer import Enforcer
+from columbia.property.property_deriver import PropertyDeriver
 from columbia.rule.rule import Rule
 from columbia.rule.pattern import match_root, pattern_children
 from columbia.rule.rule_binder import ExprBinder
 from columbia.task.abstract_task import Task
+from plan.properties import PropertySet
 
 
 class O_Group(Task):
@@ -18,7 +24,7 @@ class O_Group(Task):
     def execute(self) -> None:
         ident = "\t" * self.level
         logger.debug(
-            f"{ident} O_Group {str(self.group)} with winner {self.group.has_winner(self.context.property_set)}"
+            f"{ident} O_Group {str(self.group)} with property {self.context.property_set} .winner: {self.group.has_winner(self.context.property_set)}"
         )
 
         if self.group.cost_lower_bound > self.context.cost_upper_bound:
@@ -97,58 +103,105 @@ class O_Inputs(Task):
         self.cur_child_idx = -1
         self.prev_child_idx = -1  # This variable marks the child that is optimizing
         self.cur_total_cost = 0
+        self.cur_prop_idx = 0
         self.level = level
+        self.out_in_prop: List[Tuple[PropertySet, Tuple[PropertySet, ...]]] = []
 
     def execute(self) -> None:
         ident = "\t" * self.level
         logger.debug(
-            f"{ident}O_Inputs {self.expr} with {self.cur_child_idx+1} children with bound {self.context.cost_upper_bound}"
+            f"{ident}O_Inputs {self.expr} at {self.cur_child_idx+1} children with bound {self.context.cost_upper_bound}"
         )
-
         if self.cur_child_idx == -1:
-            # [TODO]: Add task derivastats
             self.cur_total_cost = cost_for_expr(self.expr)
             if self.cur_total_cost > self.context.cost_upper_bound:
                 return
             self.cur_child_idx = 0
+            self.out_in_prop = PropertyDeriver(
+                self.expr, self.context.property_set
+            ).derive()
 
         last_optimized = self.cur_child_idx
-        for child_group in self.expr.children[last_optimized:]:
-            if child_group.has_winner(self.context.property_set):
-                self.cur_child_idx += 1
-                self.cur_total_cost += child_group.winner_cost(
-                    self.context.property_set
-                )
-                if self.cur_total_cost > self.context.cost_upper_bound:
+        """
+        For this group, we need to optimize the task with properties in context.
+        Some properties can be passed by children, e.g.
+                  | p1 + p2 + p3(enforcer)
+                Group
+             p1 |   | p2
+                G1  G2
+        We need to process all combination of properties that can be passed to children, which is calcalated in PropertyDeriver.
+        The rest of properties need to enforcer in this group
+        """
+        for output_prop, children_property in self.out_in_prop[self.cur_prop_idx :]:
+            for child_group, child_property in zip(
+                self.expr.children[last_optimized:], children_property[last_optimized:]
+            ):
+                if child_group.has_winner(child_property):
+                    self.cur_child_idx += 1
+                    self.cur_total_cost += child_group.winner_cost(child_property)
+                    if self.cur_total_cost > self.context.cost_upper_bound:
+                        return
+                elif self.prev_child_idx != self.cur_child_idx:
+                    """
+                    Sometimes the O_Group can't get the optimal expr for this group beacause of pruning in loc 110/115
+                    The O_Input will be called after the invalid O_Group, and to avoid push O_Group repeatly, we need to mark this case.
+                    That is prev_child_idx == cur_child_idx, so we will break this loop and set the lower cost in follows
+                    O_INPUTS                  (cur_child_idx == prev_child_idx and group has no winner)
+                        =>  O_INPUTS              ⬆
+                        =>  O_GROUP               |
+                            => O_Expr             |
+                            => O_INPUYS (terminated)
+                    """
+                    self.prev_child_idx = self.cur_child_idx
+                    self.context.push_task(self)
+                    self.context.push_task(
+                        O_Group(
+                            child_group,
+                            self.context.copy_with_property(child_property),
+                            self.level + 1,
+                        )
+                    )
                     return
-            elif self.prev_child_idx != self.cur_child_idx:
-                """
-                Sometimes the O_Group can't get the optimal expr for this group beacause of pruning in loc 110/115
-                The O_Input will be called after the invalid O_Group, and to avoid push O_Group repeatly, we need to mark this case.
-                That is prev_child_idx == cur_child_idx, so we will break this loop and set the lower cost in follows
-                O_INPUTS                  (cur_child_idx == prev_child_idx and group has no winner)
-                    =>  O_INPUTS              ⬆
-                    =>  O_GROUP               |
-                        => O_Expr             |
-                        => O_INPUYS (terminated)
-                """
-                self.prev_child_idx = self.cur_child_idx
-                self.context.push_task(self)
-                self.context.push_task(
-                    O_Group(child_group, self.context.copy(), self.level + 1)
-                )
-                return
-            else:
-                # pruning
-                break
+                else:
+                    # pruning
+                    break
 
-        if self.cur_child_idx == len(self.expr.children):
-            self.expr.get_group().set_winner(
-                self.context.property_set, self.expr, self.cur_total_cost
-            )
-            self.context.cost_upper_bound = min(
-                self.cur_total_cost, self.context.cost_upper_bound
-            )
+            if self.cur_child_idx == len(self.expr.children):
+                # record this expr with output property
+                self.expr.set_property(output_prop, children_property)
+                self.expr.get_group().set_winner(
+                    output_prop, self.expr, self.cur_total_cost
+                )
+                enforcer = Enforcer(
+                    self.context.property_set,
+                    output_prop.clone(),
+                    self.expr.get_group(),
+                )
+
+                enforce_children_property = (output_prop,)
+                for enforced_expr, enforce_output_prop in enforcer:
+                    # record enforce expr with output property
+                    self.expr.get_group().record_expr(enforced_expr)
+                    enforced_expr.set_property(
+                        enforce_output_prop, enforce_children_property
+                    )
+                    self.cur_total_cost += CostCalculator().estimate(enforced_expr)
+                    enforced_expr.get_group().set_winner(
+                        enforcer.output_property(), enforced_expr, self.cur_total_cost
+                    )
+                    enforce_children_property = (enforce_output_prop,)
+
+                # The cost is responsed to the required property in context
+                self.context.cost_upper_bound = min(
+                    self.cur_total_cost, self.context.cost_upper_bound
+                )
+
+            reset()
+
+    def reset(self):
+        self.prev_child_idx = -1
+        self.cur_child_idx = 0
+        self.cur_total_cost = 0
 
 
 class ApplyRule(Task):

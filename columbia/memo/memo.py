@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple
 from columbia.memo.expr_group import GroupExpr, Group, LeafGroup
-from columbia.memo.properties import PropertySet
+from plan.properties import PropertySet
 from plan.plan import Plan, tree_printer
 
 
@@ -35,7 +35,6 @@ class Memo:
         if group is None:
             group = self.new_group()
         group.record_expr(expr)
-        expr = expr.set_group(group)
         self.expr_dict[expr] = group
         return (expr, True)
 
