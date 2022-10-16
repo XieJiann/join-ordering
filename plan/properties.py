@@ -1,5 +1,7 @@
 from enum import Enum, auto
+from functools import reduce
 from typing import Tuple
+from catalog.catalog import Table
 from plan.expr import Expression
 
 
@@ -12,6 +14,10 @@ class Property:
     def __init__(self, type: PropertyType, expressions: Tuple[Expression, ...]) -> None:
         self.type = type
         self.expressions = expressions
+        self.tables: set[Table] = set()
+        self.tables = reduce(
+            lambda a, b: a.union(b.tables()), self.expressions, self.tables
+        )
 
     def __hash__(self) -> int:
         return hash((self.type, self.expressions))

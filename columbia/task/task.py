@@ -1,4 +1,3 @@
-from cgitb import reset
 from typing import List, Tuple
 from loguru import logger
 from columbia.cost.calculator import CostCalculator
@@ -196,7 +195,7 @@ class O_Inputs(Task):
                     self.cur_total_cost, self.context.cost_upper_bound
                 )
 
-            reset()
+            self.reset()
 
     def reset(self):
         self.prev_child_idx = -1

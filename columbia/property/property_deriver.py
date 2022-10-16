@@ -40,7 +40,8 @@ class PropertyDeriver:
         # Pushdown the property of outter table
         outter_prop = PropertySet()
         for prop in self.require_prop:
-            if self.gexpr.contain(prop.expressions):
+            if prop.tables.issubset(self.gexpr.children[0].tables):
                 outter_prop.add_property(prop)
-        res.append((outter_prop, (outter_prop, PropertySet())))
+        if not outter_prop.empty():
+            res.append((outter_prop, (outter_prop, PropertySet())))
         return res

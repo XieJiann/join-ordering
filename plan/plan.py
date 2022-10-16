@@ -1,5 +1,7 @@
 from enum import Enum, auto
+from functools import reduce
 from typing import Any, List, Tuple
+from catalog.catalog import Table
 from plan.expr import Expression
 from plan.properties import PropertySet, PropertyType, Property
 
@@ -65,12 +67,9 @@ class PlanContent:
     def cost_promise(self) -> float:
         return 1 / sum(map(lambda e: e.count_exprs(), self.expressions))
 
-    def contain(self, expressions: Tuple[Expression, ...]):
-        # TODO: Add hash table to boost this procedure
-        for expr in expressions:
-            if expr not in self.expressions:
-                return False
-        return True
+    def tables(self):
+        tables: set[Table] = set()
+        return reduce(lambda a, b: a.union(b.tables()), self.expressions, tables)
 
     def __str__(self) -> str:
         if self.op_type == LogicalType.Get or self.op_type == PhyiscalType.Scan:
