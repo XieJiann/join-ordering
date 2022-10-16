@@ -26,7 +26,7 @@ plan, properties = (
     .join(Plan((), LogicalType.Get, (make_column_ref(t2, "v"),)), (make_true(),))
     .join(Plan((), LogicalType.Get, (make_column_ref(t6, "v"),)), (make_true(),))
     .join(Plan((), LogicalType.Get, (make_column_ref(t4, "v"),)), (make_true(),))
-    .order_by((make_column_ref(t3, "v"), make_column_ref(t2, "v")))
+    .order_by((make_column_ref(t5, "v"), make_column_ref(t2, "v")))
     .build()
 )
 

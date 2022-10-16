@@ -51,7 +51,7 @@ class CostCalculator:
             case PhyiscalType.Scan:
                 return n
             case EnforceType.Sort:
-                return n * math.log(n)
+                return n * max(1, math.log(n))
             case EnforceType.Hash:
                 return n
             case _:

@@ -1,7 +1,6 @@
 from typing import List, Tuple
 from loguru import logger
 from columbia.cost.calculator import CostCalculator
-from columbia.cost.cost_model import cost_for_expr
 from columbia.memo.expr_group import GroupExpr, Group
 from columbia.memo.context import Context
 from columbia.property.enforcer import Enforcer
@@ -102,6 +101,7 @@ class O_Inputs(Task):
         self.cur_child_idx = -1
         self.prev_child_idx = -1  # This variable marks the child that is optimizing
         self.cur_total_cost = 0
+        self.cur_expr_cost = 0.0
         self.cur_prop_idx = 0
         self.level = level
         self.out_in_prop: List[Tuple[PropertySet, Tuple[PropertySet, ...]]] = []
@@ -112,9 +112,13 @@ class O_Inputs(Task):
             f"{ident}O_Inputs {self.expr} at {self.cur_child_idx+1} children with bound {self.context.cost_upper_bound}"
         )
         if self.cur_child_idx == -1:
-            self.cur_total_cost = cost_for_expr(self.expr)
-            if self.cur_total_cost > self.context.cost_upper_bound:
+            logger.debug(
+                f"{ident}└─── init cost {CostCalculator().estimate(self.expr)}"
+            )
+            self.cur_expr_cost = CostCalculator().estimate(self.expr)
+            if self.cur_expr_cost > self.context.cost_upper_bound:
                 return
+            self.cur_total_cost += self.cur_expr_cost
             self.cur_child_idx = 0
             self.out_in_prop = PropertyDeriver(
                 self.expr, self.context.property_set
@@ -136,6 +140,9 @@ class O_Inputs(Task):
                 self.expr.children[last_optimized:], children_property[last_optimized:]
             ):
                 if child_group.has_winner(child_property):
+                    logger.debug(
+                        f"{ident}└───add child cost {self.cur_total_cost} + {child_group.winner_cost(child_property)} of {child_property}"
+                    )
                     self.cur_child_idx += 1
                     self.cur_total_cost += child_group.winner_cost(child_property)
                     if self.cur_total_cost > self.context.cost_upper_bound:
@@ -200,7 +207,8 @@ class O_Inputs(Task):
     def reset(self):
         self.prev_child_idx = -1
         self.cur_child_idx = 0
-        self.cur_total_cost = 0
+        self.cur_total_cost = self.cur_expr_cost
+        self.init_expr_cost = False
 
 
 class ApplyRule(Task):
